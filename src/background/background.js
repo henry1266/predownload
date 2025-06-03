@@ -6,54 +6,127 @@ let monitoringTabs = new Map(); // 記錄正在監測的標籤頁
 let lastNotificationTime = 0;
 const NOTIFICATION_COOLDOWN = 5000; // 通知冷卻時間 5 秒
 
-// 使用 Canvas API 動態生成圖示
+// 使用 ImageData 直接操作像素數據來創建圖示
+// 適用於 service worker 環境
 function createMonitoringIcon() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 19;
-  canvas.height = 19;
-  const context = canvas.getContext('2d');
-
-  // 綠色圓形背景
-  context.fillStyle = "#4CAF50"; // 綠色
-  context.beginPath();
-  context.arc(9.5, 9.5, 9, 0, 2 * Math.PI);
-  context.fill();
+  const size = 19;
+  const data = new Uint8ClampedArray(size * size * 4); // RGBA 數據
   
-  // 白色播放圖示
-  context.fillStyle = "#FFFFFF";
-  context.beginPath();
-  context.moveTo(7, 6);
-  context.lineTo(7, 13);
-  context.lineTo(14, 9.5);
-  context.closePath();
-  context.fill();
-
-  return context.getImageData(0, 0, 19, 19);
+  // 創建一個 ImageData 對象
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const index = (y * size + x) * 4;
+      
+      // 計算像素到中心的距離
+      const distanceToCenter = Math.sqrt(Math.pow(x - size/2, 2) + Math.pow(y - size/2, 2));
+      
+      if (distanceToCenter <= size/2) {
+        // 綠色圓形背景 (#4CAF50)
+        data[index] = 76;     // R
+        data[index + 1] = 175; // G
+        data[index + 2] = 80;  // B
+        data[index + 3] = 255; // A (完全不透明)
+        
+        // 繪製白色播放圖示 (三角形)
+        const trianglePoints = [
+          {x: 7, y: 6},
+          {x: 7, y: 13},
+          {x: 14, y: 9.5}
+        ];
+        
+        // 檢查點是否在三角形內
+        if (isPointInTriangle({x, y}, trianglePoints[0], trianglePoints[1], trianglePoints[2])) {
+          data[index] = 255;     // R
+          data[index + 1] = 255; // G
+          data[index + 2] = 255; // B
+        }
+      } else {
+        // 透明背景
+        data[index] = 0;
+        data[index + 1] = 0;
+        data[index + 2] = 0;
+        data[index + 3] = 0;
+      }
+    }
+  }
+  
+  return new ImageData(data, size, size);
 }
 
 function createStoppedIcon() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 19;
-  canvas.height = 19;
-  const context = canvas.getContext('2d');
-
-  // 紅色圓形背景
-  context.fillStyle = "#F44336"; // 紅色
-  context.beginPath();
-  context.arc(9.5, 9.5, 9, 0, 2 * Math.PI);
-  context.fill();
+  const size = 19;
+  const data = new Uint8ClampedArray(size * size * 4); // RGBA 數據
   
-  // 白色停止圖示 (X)
-  context.strokeStyle = "#FFFFFF";
-  context.lineWidth = 2;
-  context.beginPath();
-  context.moveTo(6, 6);
-  context.lineTo(13, 13);
-  context.moveTo(13, 6);
-  context.lineTo(6, 13);
-  context.stroke();
+  // 創建一個 ImageData 對象
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const index = (y * size + x) * 4;
+      
+      // 計算像素到中心的距離
+      const distanceToCenter = Math.sqrt(Math.pow(x - size/2, 2) + Math.pow(y - size/2, 2));
+      
+      if (distanceToCenter <= size/2) {
+        // 紅色圓形背景 (#F44336)
+        data[index] = 244;    // R
+        data[index + 1] = 67;  // G
+        data[index + 2] = 54;  // B
+        data[index + 3] = 255; // A (完全不透明)
+        
+        // 繪製白色 X 圖示
+        const lineWidth = 2;
+        const x1 = 6, y1 = 6, x2 = 13, y2 = 13;
+        const x3 = 13, y3 = 6, x4 = 6, y4 = 13;
+        
+        // 檢查點是否在線段附近
+        if (isPointNearLine({x, y}, {x: x1, y: y1}, {x: x2, y: y2}, lineWidth) ||
+            isPointNearLine({x, y}, {x: x3, y: y3}, {x: x4, y: y4}, lineWidth)) {
+          data[index] = 255;     // R
+          data[index + 1] = 255; // G
+          data[index + 2] = 255; // B
+        }
+      } else {
+        // 透明背景
+        data[index] = 0;
+        data[index + 1] = 0;
+        data[index + 2] = 0;
+        data[index + 3] = 0;
+      }
+    }
+  }
+  
+  return new ImageData(data, size, size);
+}
 
-  return context.getImageData(0, 0, 19, 19);
+// 輔助函數：檢查點是否在三角形內
+function isPointInTriangle(pt, v1, v2, v3) {
+  function sign(p1, p2, p3) {
+    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+  }
+  
+  const d1 = sign(pt, v1, v2);
+  const d2 = sign(pt, v2, v3);
+  const d3 = sign(pt, v3, v1);
+  
+  const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+  const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+  
+  return !(hasNeg && hasPos);
+}
+
+// 輔助函數：檢查點是否在線段附近
+function isPointNearLine(pt, v1, v2, maxDistance) {
+  function distToSegmentSquared(p, v, w) {
+    const l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
+    if (l2 === 0) return Math.pow(p.x - v.x, 2) + Math.pow(p.y - v.y, 2);
+    
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    
+    return Math.pow(p.x - (v.x + t * (w.x - v.x)), 2) + 
+           Math.pow(p.y - (v.y + t * (w.y - v.y)), 2);
+  }
+  
+  return Math.sqrt(distToSegmentSquared(pt, v1, v2)) <= maxDistance;
 }
 
 // 監聽擴充功能安裝事件
