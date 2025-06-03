@@ -6,23 +6,54 @@ let monitoringTabs = new Map(); // 記錄正在監測的標籤頁
 let lastNotificationTime = 0;
 const NOTIFICATION_COOLDOWN = 5000; // 通知冷卻時間 5 秒
 
-// 瀏覽器圖示路徑
-const BROWSER_ICONS = {
-  DEFAULT: {
-    16: 'assets/icon16.png',
-    48: 'assets/icon48.png',
-    128: 'assets/icon128.png'
-  },
-  MONITORING: {
-    16: 'assets/browser_icons/icon_monitoring.png',
-    48: 'assets/browser_icons/icon_monitoring.png',
-    128: 'assets/browser_icons/icon_monitoring.png'
-  },
-  STOPPED: {
-    16: 'assets/browser_icons/icon_stopped.png',
-    48: 'assets/browser_icons/icon_stopped.png',
-    128: 'assets/browser_icons/icon_stopped.png'
-  }
+// 使用 Canvas API 動態生成圖示
+function createMonitoringIcon() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 19;
+  canvas.height = 19;
+  const context = canvas.getContext('2d');
+
+  // 綠色圓形背景
+  context.fillStyle = "#4CAF50"; // 綠色
+  context.beginPath();
+  context.arc(9.5, 9.5, 9, 0, 2 * Math.PI);
+  context.fill();
+  
+  // 白色播放圖示
+  context.fillStyle = "#FFFFFF";
+  context.beginPath();
+  context.moveTo(7, 6);
+  context.lineTo(7, 13);
+  context.lineTo(14, 9.5);
+  context.closePath();
+  context.fill();
+
+  return context.getImageData(0, 0, 19, 19);
+}
+
+function createStoppedIcon() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 19;
+  canvas.height = 19;
+  const context = canvas.getContext('2d');
+
+  // 紅色圓形背景
+  context.fillStyle = "#F44336"; // 紅色
+  context.beginPath();
+  context.arc(9.5, 9.5, 9, 0, 2 * Math.PI);
+  context.fill();
+  
+  // 白色停止圖示 (X)
+  context.strokeStyle = "#FFFFFF";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(6, 6);
+  context.lineTo(13, 13);
+  context.moveTo(13, 6);
+  context.lineTo(6, 13);
+  context.stroke();
+
+  return context.getImageData(0, 0, 19, 19);
 }
 
 // 監聽擴充功能安裝事件
@@ -38,9 +69,8 @@ chrome.runtime.onInstalled.addListener(() => {
   });
   
   // 初始化設置停止狀態圖示
-  chrome.action.setIcon({
-    path: BROWSER_ICONS.STOPPED
-  });
+  const imageData = createStoppedIcon();
+  chrome.action.setIcon({ imageData });
   console.log('初始化設置圖示為停止狀態');
 });
 
@@ -82,9 +112,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       monitoringTabs.delete(sender.tab.id);
       // 檢查是否還有其他標籤頁在監測中
       if (monitoringTabs.size === 0) {
-        chrome.action.setIcon({
-          path: BROWSER_ICONS.STOPPED
-        });
+        const imageData = createStoppedIcon();
+        chrome.action.setIcon({ imageData });
       }
       sendResponse({ success: true });
       break;
@@ -482,20 +511,24 @@ function updateBrowserIcon(tabId, status) {
     // 根據監測狀態設置圖示
     if (isMonitoring) {
       console.log(`設置標籤頁 ${tabId} 的圖示為監測中狀態`);
-      chrome.action.setIcon({
-        path: BROWSER_ICONS.MONITORING
-      });
+      // 使用 Canvas API 動態生成綠色播放圖示
+      const imageData = createMonitoringIcon();
+      chrome.action.setIcon({ imageData });
     } else {
       console.log(`設置標籤頁 ${tabId} 的圖示為停止狀態`);
-      chrome.action.setIcon({
-        path: BROWSER_ICONS.STOPPED
-      });
+      // 使用 Canvas API 動態生成紅色停止圖示
+      const imageData = createStoppedIcon();
+      chrome.action.setIcon({ imageData });
     }
   } catch (error) {
     console.error('更新瀏覽器圖示時發生錯誤:', error);
-    // 發生錯誤時恢復為預設圖示
+    // 發生錯誤時使用預設圖示
     chrome.action.setIcon({
-      path: BROWSER_ICONS.DEFAULT
+      path: {
+        16: 'assets/icon16.png',
+        48: 'assets/icon48.png',
+        128: 'assets/icon128.png'
+      }
     });
   }
 }
@@ -509,9 +542,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     // 檢查是否還有其他標籤頁在監測中
     if (monitoringTabs.size === 0) {
       // 所有監測標籤頁都已關閉，設置為停止狀態
-      chrome.action.setIcon({
-        path: BROWSER_ICONS.STOPPED
-      });
+      const imageData = createStoppedIcon();
+      chrome.action.setIcon({ imageData });
       console.log('所有監測標籤頁已關閉，設置圖示為停止狀態');
     }
   }
