@@ -187,7 +187,7 @@ async function saveExtractedData(extractedData, tabId) {
     const minute = String(now.getMinutes()).padStart(2, '0');
     const second = String(now.getSeconds()).padStart(2, '0');
     
-    const timeStamp = `${year}:${month}:${day}_${hour}:${minute}:${second}`;
+    const timeStamp = `${year}-${month}-${day}_${hour}-${minute}-${second}`;
     
     // 獲取標籤頁資訊
     let tabInfo;
