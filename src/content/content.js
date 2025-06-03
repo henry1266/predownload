@@ -165,7 +165,7 @@ function startMonitoring() {
     return;
   }
   
-  console.log('開始監測 URL 跳轉...');
+  //console.log('開始監測 URL 跳轉...');
   isMonitoring = true;
   currentUrl = window.location.href;
   
@@ -185,8 +185,8 @@ function startMonitoring() {
     checkUrlChange();
   }, MONITOR_CONFIG.urlCheckInterval);
   
-  console.log('URL 跳轉監測已啟動');
-  notifyUser('開始監測頁面跳轉', 'success');
+  //console.log('URL 跳轉監測已啟動');
+  notifyUser('開始監測過卡', 'success');
 }
 
 // 停止監測
@@ -239,10 +239,10 @@ function checkUrlChange() {
       
     } else if (isUrlStartPage(newUrl)) {
       console.log('↩️ 跳轉回起始頁面，繼續等待下次成功跳轉');
-      notifyUser('跳轉回起始頁面，繼續等待下次成功跳轉', 'info');
+      //notifyUser('跳轉回起始頁面，繼續等待下次成功跳轉', 'info');
     } else {
       console.log('🔄 頁面跳轉中...');
-      notifyUser('頁面跳轉中...', 'info');
+      //notifyUser('頁面跳轉中...', 'info');
     }
     
     currentUrl = newUrl;
