@@ -1,5 +1,5 @@
-// 頁面監測版本 - 彈出視窗腳本 (頁面重整觸發版)
-// 處理頁面重整監測功能的使用者介面互動
+// 頁面監測版本 - 彈出視窗腳本 (URL 跳轉監測版)
+// 處理 URL 跳轉監測功能的使用者介面互動
 
 // 全域變數
 let currentTabId = null;
@@ -64,6 +64,8 @@ function updateMonitoringStatus(status) {
   const monitorInfo = document.getElementById('monitorInfo');
   const startTime = document.getElementById('startTime');
   const lastActivity = document.getElementById('lastActivity');
+  const jumpCount = document.getElementById('jumpCount');
+  const successfulJumps = document.getElementById('successfulJumps');
   const toggleBtn = document.getElementById('toggleMonitorBtn');
   const monitorIcon = document.getElementById('monitorIcon');
   const monitorBtnText = document.getElementById('monitorBtnText');
@@ -76,21 +78,33 @@ function updateMonitoringStatus(status) {
     
     // 根據頁面狀態顯示不同的監測狀態
     if (status.isOnTargetPage) {
-      statusText.textContent = '正在監測頁面重整';
-      pageStatus.textContent = '目標頁面 - 監測頁面重整和資料變化';
+      statusText.textContent = '正在監測 URL 跳轉';
+      pageStatus.textContent = '目標頁面 - 監測跳轉事件';
       pageStatus.className = 'page-status target';
+    } else if (status.isOnStartPage) {
+      statusText.textContent = '正在監測 URL 跳轉';
+      pageStatus.textContent = '起始頁面 - 等待跳轉到目標頁面';
+      pageStatus.className = 'page-status waiting';
     } else if (currentTabInfo && currentTabInfo.url.includes('medcloud2.nhi.gov.tw')) {
-      statusText.textContent = '正在監測頁面重整';
-      pageStatus.textContent = '相關頁面 - 監測頁面重整';
+      statusText.textContent = '正在監測 URL 跳轉';
+      pageStatus.textContent = '相關頁面 - 監測跳轉事件';
       pageStatus.className = 'page-status related';
     } else {
-      statusText.textContent = '正在監測頁面重整';
-      pageStatus.textContent = '一般頁面 - 監測頁面重整';
+      statusText.textContent = '正在監測 URL 跳轉';
+      pageStatus.textContent = '一般頁面 - 監測跳轉事件';
       pageStatus.className = 'page-status general';
     }
     
     startTime.textContent = formatTime(status.startTime);
-    lastActivity.textContent = formatTime(status.lastProcessed || status.pageLoadTime);
+    lastActivity.textContent = formatTime(status.lastProcessed);
+    
+    // 顯示跳轉統計
+    if (jumpCount) {
+      jumpCount.textContent = status.jumpCount || 0;
+    }
+    if (successfulJumps) {
+      successfulJumps.textContent = status.successfulJumps || 0;
+    }
     
     toggleBtn.className = 'monitor-btn stop';
     toggleBtn.disabled = false;
@@ -107,13 +121,16 @@ function updateMonitoringStatus(status) {
     // 顯示當前頁面狀態
     if (currentTabInfo) {
       if (isTargetUrl(currentTabInfo.url)) {
-        pageStatus.textContent = '目標頁面 - 可開始監測頁面重整';
+        pageStatus.textContent = '目標頁面 - 可開始監測跳轉事件';
         pageStatus.className = 'page-status target';
+      } else if (isStartUrl(currentTabInfo.url)) {
+        pageStatus.textContent = '起始頁面 - 可開始監測跳轉事件';
+        pageStatus.className = 'page-status start';
       } else if (isRelevantUrl(currentTabInfo.url)) {
-        pageStatus.textContent = '相關頁面 - 可開始監測頁面重整';
+        pageStatus.textContent = '相關頁面 - 可開始監測跳轉事件';
         pageStatus.className = 'page-status related';
       } else {
-        pageStatus.textContent = '一般頁面 - 可開始監測頁面重整';
+        pageStatus.textContent = '一般頁面 - 可開始監測跳轉事件';
         pageStatus.className = 'page-status general';
       }
     } else {
@@ -321,7 +338,12 @@ function captureAndExtract() {
 
 // 檢查是否為目標網址
 function isTargetUrl(url) {
-  return url && url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008');
+  return url && url.includes('/IMUE0008');
+}
+
+// 檢查是否為起始網址
+function isStartUrl(url) {
+  return url && (url.includes('/imu/IMUE1000/#') || url.endsWith('/imu/IMUE1000/'));
 }
 
 // 檢查是否為相關網址
@@ -350,46 +372,14 @@ function updatePageInfo() {
     // 根據頁面類型設置樣式
     if (isTargetUrl(url)) {
       pageInfo.className = 'page-info target';
+    } else if (isStartUrl(url)) {
+      pageInfo.className = 'page-info start';
     } else if (isRelevantUrl(url)) {
       pageInfo.className = 'page-info related';
     } else {
       pageInfo.className = 'page-info general';
     }
   }
-}
-
-// 手動重新整理頁面
-function refreshPage() {
-  if (!currentTabId) return;
-  
-  const refreshBtn = document.getElementById('refreshBtn');
-  if (refreshBtn) {
-    refreshBtn.disabled = true;
-    refreshBtn.textContent = '重新整理中...';
-  }
-  
-  // 重新整理當前標籤頁
-  chrome.tabs.reload(currentTabId, function() {
-    if (chrome.runtime.lastError) {
-      console.error('重新整理頁面失敗:', formatErrorMessage(chrome.runtime.lastError));
-      showError('重新整理頁面失敗');
-    } else {
-      console.log('頁面重新整理成功');
-      
-      // 如果正在監測，重新整理後會自動觸發檢測
-      if (monitoringStatus) {
-        setTimeout(() => {
-          checkMonitoringStatus();
-        }, 2000);
-      }
-    }
-    
-    // 恢復按鈕狀態
-    if (refreshBtn) {
-      refreshBtn.disabled = false;
-      refreshBtn.textContent = '🔄 重新整理';
-    }
-  });
 }
 
 // 初始化
@@ -409,14 +399,13 @@ document.addEventListener('DOMContentLoaded', function() {
       checkMonitoringStatus();
       
       // 設置定期檢查
-      statusCheckInterval = setInterval(checkMonitoringStatus, 3000);
+      statusCheckInterval = setInterval(checkMonitoringStatus, 2000);
     }
   });
   
   // 綁定事件監聽器
   const toggleMonitorBtn = document.getElementById('toggleMonitorBtn');
   const captureBtn = document.getElementById('captureBtn');
-  const refreshBtn = document.getElementById('refreshBtn');
   const helpLink = document.getElementById('helpLink');
   const settingsLink = document.getElementById('settingsLink');
   
@@ -428,11 +417,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // 手動擷取按鈕
   if (captureBtn) {
     captureBtn.addEventListener('click', captureAndExtract);
-  }
-  
-  // 重新整理按鈕
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', refreshPage);
   }
   
   // 說明連結

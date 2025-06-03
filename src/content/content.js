@@ -1,25 +1,27 @@
-// 頁面監測版本 - 內容腳本 (頁面重整觸發版)
-// 監測頁面重整並在檢測到新資料時自動執行動作
+// 頁面監測版本 - 內容腳本 (URL 跳轉監測版)
+// 監測頁面在失敗頁面和成功頁面之間的跳轉，只在成功跳轉到目標頁面時觸發動作
 
 // 監測配置
 const MONITOR_CONFIG = {
-  targetUrl: 'https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008', // 目標頁面
-  checkDelay: 3000, // 頁面載入後延遲檢查時間 (毫秒)
+  startUrl: 'https://medcloud2.nhi.gov.tw/imu/IMUE1000/#', // 失敗頁面
+  targetUrl: 'https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008', // 成功頁面
+  urlCheckInterval: 500, // URL 檢查間隔 (毫秒)
+  dataCheckDelay: 2000, // 跳轉到目標頁面後延遲檢查資料的時間
   maxRetries: 3, // 最大重試次數
-  debounceDelay: 1000, // 防抖延遲 (毫秒)
-  cooldownPeriod: 10000 // 冷卻期間 (10秒，縮短以適應重整觸發)
+  cooldownPeriod: 5000 // 冷卻期間 (5秒)
 };
 
 // 全域變數
 let isMonitoring = false;
-let lastDataSnapshot = null;
-let lastProcessedHash = null; // 記錄最後處理的資料雜湊
-let mutationObserver = null;
-let debounceTimer = null;
-let retryCount = 0;
-let lastProcessedTime = 0; // 最後處理時間
-let pageLoadTime = Date.now(); // 頁面載入時間
+let urlCheckInterval = null;
+let currentUrl = window.location.href;
+let lastProcessedHash = null;
+let lastProcessedTime = 0;
 let monitoringStartTime = null;
+let jumpCount = 0; // 跳轉計數
+let successfulJumps = 0; // 成功跳轉計數
+let lastDataSnapshot = null;
+let retryCount = 0;
 
 // 監聽來自背景腳本的消息
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -29,24 +31,319 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // 非同步回應
   } else if (message.action === 'startMonitoring') {
     console.log('收到開始監測的請求');
-    startPageRefreshMonitoring();
-    sendResponse({ success: true, message: '開始監測頁面重整' });
+    startUrlJumpMonitoring();
+    sendResponse({ success: true, message: '開始監測頁面跳轉' });
   } else if (message.action === 'stopMonitoring') {
     console.log('收到停止監測的請求');
-    stopPageRefreshMonitoring();
-    sendResponse({ success: true, message: '停止監測頁面重整' });
+    stopUrlJumpMonitoring();
+    sendResponse({ success: true, message: '停止監測頁面跳轉' });
   } else if (message.action === 'getMonitorStatus') {
     sendResponse({ 
       isMonitoring: isMonitoring,
       currentUrl: window.location.href,
       isOnTargetPage: isOnTargetPage(),
+      isOnStartPage: isOnStartPage(),
       lastProcessed: lastProcessedTime ? new Date(lastProcessedTime).toISOString() : null,
       startTime: monitoringStartTime,
-      pageLoadTime: new Date(pageLoadTime).toISOString()
+      jumpCount: jumpCount,
+      successfulJumps: successfulJumps
     });
   }
   return true;
 });
+
+// 檢查是否在目標頁面
+function isOnTargetPage() {
+  const url = window.location.href;
+  return url.includes('/IMUE0008');
+}
+
+// 檢查是否在起始頁面
+function isOnStartPage() {
+  const url = window.location.href;
+  return url.includes('/imu/IMUE1000/#') || url.endsWith('/imu/IMUE1000/');
+}
+
+// 檢查是否為相關頁面
+function isRelevantPage() {
+  const url = window.location.href;
+  return url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/');
+}
+
+// 開始 URL 跳轉監測
+function startUrlJumpMonitoring() {
+  if (isMonitoring) {
+    console.log('監測已在運行中');
+    return;
+  }
+  
+  console.log('開始監測 URL 跳轉...');
+  isMonitoring = true;
+  retryCount = 0;
+  jumpCount = 0;
+  successfulJumps = 0;
+  monitoringStartTime = new Date().toISOString();
+  currentUrl = window.location.href;
+  
+  // 顯示當前狀態
+  console.log('當前 URL:', currentUrl);
+  if (isOnTargetPage()) {
+    console.log('當前在目標頁面，開始監測跳轉');
+    notifyUser('開始監測頁面跳轉 - 當前在目標頁面', 'info');
+    
+    // 如果已經在目標頁面，先檢查一次資料
+    setTimeout(() => {
+      if (isMonitoring) {
+        checkDataAfterSuccessfulJump();
+      }
+    }, MONITOR_CONFIG.dataCheckDelay);
+    
+  } else if (isOnStartPage()) {
+    console.log('當前在起始頁面，等待跳轉到目標頁面');
+    notifyUser('開始監測頁面跳轉 - 等待跳轉到目標頁面', 'info');
+  } else if (isRelevantPage()) {
+    console.log('當前在相關頁面，啟用通用跳轉監測');
+    notifyUser('啟用頁面跳轉監測', 'info');
+  } else {
+    console.log('當前頁面不是目標系統，啟用通用監測');
+    notifyUser('啟用通用頁面跳轉監測', 'info');
+  }
+  
+  // 開始 URL 監測循環
+  startUrlCheckLoop();
+  
+  console.log('URL 跳轉監測已啟動');
+}
+
+// 停止 URL 跳轉監測
+function stopUrlJumpMonitoring() {
+  if (!isMonitoring) {
+    return;
+  }
+  
+  console.log('停止 URL 跳轉監測...');
+  isMonitoring = false;
+  
+  // 清理 URL 檢查循環
+  if (urlCheckInterval) {
+    clearInterval(urlCheckInterval);
+    urlCheckInterval = null;
+  }
+  
+  console.log(`監測已停止。總跳轉次數: ${jumpCount}, 成功跳轉次數: ${successfulJumps}`);
+  notifyUser(`監測已停止 - 總跳轉 ${jumpCount} 次，成功 ${successfulJumps} 次`, 'info');
+}
+
+// 開始 URL 檢查循環
+function startUrlCheckLoop() {
+  if (urlCheckInterval) {
+    clearInterval(urlCheckInterval);
+  }
+  
+  urlCheckInterval = setInterval(() => {
+    if (!isMonitoring) {
+      clearInterval(urlCheckInterval);
+      return;
+    }
+    
+    checkUrlChange();
+  }, MONITOR_CONFIG.urlCheckInterval);
+  
+  console.log('URL 檢查循環已啟動，檢查間隔:', MONITOR_CONFIG.urlCheckInterval, 'ms');
+}
+
+// 檢查 URL 變化
+function checkUrlChange() {
+  const newUrl = window.location.href;
+  
+  if (newUrl !== currentUrl) {
+    console.log('檢測到 URL 變化:');
+    console.log('舊 URL:', currentUrl);
+    console.log('新 URL:', newUrl);
+    
+    jumpCount++;
+    
+    // 檢查是否跳轉到目標頁面
+    if (isUrlTargetPage(newUrl)) {
+      console.log('🎯 成功跳轉到目標頁面！');
+      successfulJumps++;
+      
+      notifyUser(`成功跳轉到目標頁面！(第 ${successfulJumps} 次)`, 'success');
+      
+      // 延遲檢查資料，確保頁面完全載入
+      setTimeout(() => {
+        if (isMonitoring && isOnTargetPage()) {
+          checkDataAfterSuccessfulJump();
+        }
+      }, MONITOR_CONFIG.dataCheckDelay);
+      
+    } else if (isUrlStartPage(newUrl)) {
+      console.log('↩️ 跳轉回起始頁面，繼續監測...');
+      notifyUser('跳轉回起始頁面，繼續等待下次成功跳轉', 'warning');
+      
+    } else {
+      console.log('🔄 跳轉到其他頁面:', newUrl);
+      notifyUser('頁面跳轉中...', 'info');
+    }
+    
+    // 更新當前 URL
+    currentUrl = newUrl;
+  }
+}
+
+// 檢查 URL 是否為目標頁面
+function isUrlTargetPage(url) {
+  return url.includes('/IMUE0008');
+}
+
+// 檢查 URL 是否為起始頁面
+function isUrlStartPage(url) {
+  return url.includes('/imu/IMUE1000/#') || url.endsWith('/imu/IMUE1000/');
+}
+
+// 成功跳轉後檢查資料
+function checkDataAfterSuccessfulJump() {
+  try {
+    console.log('成功跳轉到目標頁面，開始檢查資料...');
+    
+    // 檢查是否在冷卻期間
+    const now = Date.now();
+    if (lastProcessedTime && (now - lastProcessedTime) < MONITOR_CONFIG.cooldownPeriod) {
+      const remainingTime = Math.ceil((MONITOR_CONFIG.cooldownPeriod - (now - lastProcessedTime)) / 1000);
+      console.log(`在冷卻期間，還需等待 ${remainingTime} 秒`);
+      notifyUser(`冷卻期間，等待 ${remainingTime} 秒`, 'warning');
+      return;
+    }
+
+    const currentTableData = extractTableData();
+    const currentPersonalInfo = getPersonalInfo();
+    
+    // 檢查是否有實際資料
+    if (!currentTableData || currentTableData.length === 0) {
+      console.log('跳轉後未找到資料，可能頁面還在載入中');
+      
+      // 重試機制
+      retryCount++;
+      if (retryCount < MONITOR_CONFIG.maxRetries) {
+        console.log(`重試檢查資料 (${retryCount}/${MONITOR_CONFIG.maxRetries})`);
+        setTimeout(() => {
+          if (isMonitoring && isOnTargetPage()) {
+            checkDataAfterSuccessfulJump();
+          }
+        }, 2000);
+      } else {
+        console.log('達到最大重試次數，跳過此次檢查');
+        retryCount = 0;
+      }
+      return;
+    }
+    
+    const currentHash = generateDataHash(currentTableData, currentPersonalInfo);
+    
+    // 比較雜湊值
+    if (!lastDataSnapshot || currentHash !== lastDataSnapshot.hash) {
+      // 再次檢查是否與最後處理的資料相同
+      if (lastProcessedHash === currentHash) {
+        console.log('資料與最後處理的相同，跳過重複處理');
+        notifyUser('資料未變化，跳過重複處理', 'info');
+        return;
+      }
+      
+      console.log('跳轉後檢測到新資料!');
+      console.log('舊雜湊:', lastDataSnapshot ? lastDataSnapshot.hash : 'null');
+      console.log('新雜湊:', currentHash);
+      console.log('資料筆數:', currentTableData.length);
+      
+      // 更新快照
+      updateDataSnapshot(currentTableData, currentPersonalInfo);
+      
+      // 觸發自動動作
+      triggerAutoActionAfterJump(currentTableData, currentPersonalInfo);
+      
+      // 記錄處理狀態
+      lastProcessedHash = currentHash;
+      lastProcessedTime = now;
+      
+      retryCount = 0; // 重置重試計數
+    } else {
+      console.log('跳轉後資料無變化');
+      notifyUser('跳轉成功，但資料無變化', 'info');
+      
+      // 更新快照時間，但不觸發動作
+      if (lastDataSnapshot) {
+        lastDataSnapshot.timestamp = new Date().toISOString();
+      }
+    }
+  } catch (error) {
+    console.error('檢查跳轉後資料時發生錯誤:', error);
+    retryCount++;
+    
+    if (retryCount >= MONITOR_CONFIG.maxRetries) {
+      console.error('達到最大重試次數');
+      notifyUser('資料檢查發生錯誤', 'error');
+      retryCount = 0;
+    }
+  }
+}
+
+// 更新資料快照
+function updateDataSnapshot(tableData, personalInfo) {
+  lastDataSnapshot = {
+    tableData: tableData,
+    personalInfo: personalInfo,
+    timestamp: new Date().toISOString(),
+    hash: generateDataHash(tableData, personalInfo)
+  };
+}
+
+// 生成資料雜湊值
+function generateDataHash(tableData, personalInfo) {
+  const dataString = JSON.stringify({
+    tableCount: tableData ? tableData.length : 0,
+    tableData: tableData,
+    personalInfo: personalInfo,
+    url: window.location.href,
+    jumpCount: jumpCount // 加入跳轉計數作為雜湊因子
+  });
+  
+  // 簡單的雜湊函數
+  let hash = 0;
+  for (let i = 0; i < dataString.length; i++) {
+    const char = dataString.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // 轉換為 32 位整數
+  }
+  return hash.toString();
+}
+
+// 觸發跳轉後的自動動作
+function triggerAutoActionAfterJump(tableData, personalInfo) {
+  console.log('觸發跳轉後的自動動作...');
+  
+  try {
+    // 通知背景腳本有新資料
+    chrome.runtime.sendMessage({
+      action: 'dataChanged',
+      data: {
+        tableData: tableData,
+        personalInfo: personalInfo,
+        timestamp: new Date().toISOString(),
+        url: window.location.href,
+        trigger: 'url_jump', // 標記觸發原因
+        jumpCount: jumpCount,
+        successfulJumps: successfulJumps
+      }
+    });
+    
+    // 顯示通知
+    const dataCount = tableData ? tableData.length : 0;
+    notifyUser(`跳轉後檢測到新資料！共 ${dataCount} 筆記錄 (第 ${successfulJumps} 次成功跳轉)`, 'success');
+    
+  } catch (error) {
+    console.error('觸發跳轉後自動動作時發生錯誤:', error);
+    notifyUser('自動動作執行失敗', 'error');
+  }
+}
 
 // 處理資料擷取
 function handleDataExtraction(sendResponse) {
@@ -126,321 +423,6 @@ function handleDataExtraction(sendResponse) {
   }
 }
 
-// 檢查是否在目標頁面
-function isOnTargetPage() {
-  const url = window.location.href;
-  return url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008');
-}
-
-// 檢查是否為相關頁面
-function isRelevantPage() {
-  const url = window.location.href;
-  return url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/') || detectMedicalSystem();
-}
-
-// 開始頁面重整監測
-function startPageRefreshMonitoring() {
-  if (isMonitoring) {
-    console.log('監測已在運行中');
-    return;
-  }
-  
-  console.log('開始監測頁面重整...');
-  isMonitoring = true;
-  retryCount = 0;
-  monitoringStartTime = new Date().toISOString();
-  
-  // 顯示當前狀態
-  if (isOnTargetPage()) {
-    console.log('當前在目標頁面，開始監測頁面重整');
-    notifyUser('開始監測頁面重整', 'info');
-    
-    // 初始化資料快照
-    initializeDataSnapshot();
-    
-    // 設置 MutationObserver 作為輔助監測
-    setupMutationObserver();
-    
-    // 檢查是否為頁面重整後的載入
-    checkIfPageRefreshed();
-    
-  } else if (isRelevantPage()) {
-    console.log('當前在相關頁面，啟用通用重整監測');
-    notifyUser('啟用頁面重整監測', 'info');
-    
-    // 檢查是否為頁面重整後的載入
-    checkIfPageRefreshed();
-  } else {
-    console.log('當前頁面不是目標系統，啟用通用監測');
-    notifyUser('啟用通用頁面重整監測', 'info');
-  }
-  
-  // 監聽頁面卸載事件
-  window.addEventListener('beforeunload', stopPageRefreshMonitoring);
-  
-  console.log('頁面重整監測已啟動');
-}
-
-// 停止頁面重整監測
-function stopPageRefreshMonitoring() {
-  if (!isMonitoring) {
-    return;
-  }
-  
-  console.log('停止頁面重整監測...');
-  isMonitoring = false;
-  
-  // 清理 MutationObserver
-  if (mutationObserver) {
-    mutationObserver.disconnect();
-    mutationObserver = null;
-  }
-  
-  // 清理定時器
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
-  }
-  
-  console.log('頁面重整監測已停止');
-}
-
-// 檢查是否為頁面重整後的載入
-function checkIfPageRefreshed() {
-  // 檢查頁面載入時間，如果是最近載入的，可能是重整
-  const timeSinceLoad = Date.now() - pageLoadTime;
-  
-  if (timeSinceLoad < 5000) { // 5秒內載入的頁面
-    console.log('檢測到頁面可能剛重整，延遲檢查資料...');
-    
-    // 延遲檢查，確保頁面完全載入
-    setTimeout(() => {
-      if (isMonitoring) {
-        console.log('頁面重整後檢查資料變化');
-        checkForDataChangesAfterRefresh();
-      }
-    }, MONITOR_CONFIG.checkDelay);
-  }
-}
-
-// 頁面重整後檢查資料變化
-function checkForDataChangesAfterRefresh() {
-  try {
-    console.log('檢查頁面重整後的資料變化...');
-    
-    // 檢查是否在冷卻期間
-    const now = Date.now();
-    if (lastProcessedTime && (now - lastProcessedTime) < MONITOR_CONFIG.cooldownPeriod) {
-      console.log('在冷卻期間，跳過檢查');
-      return;
-    }
-
-    const currentTableData = extractTableData();
-    const currentPersonalInfo = getPersonalInfo();
-    
-    // 檢查是否有實際資料
-    if (!currentTableData || currentTableData.length === 0) {
-      console.log('頁面重整後未找到資料');
-      return;
-    }
-    
-    const currentHash = generateDataHash(currentTableData, currentPersonalInfo);
-    
-    // 比較雜湊值
-    if (!lastDataSnapshot || currentHash !== lastDataSnapshot.hash) {
-      // 再次檢查是否與最後處理的資料相同
-      if (lastProcessedHash === currentHash) {
-        console.log('資料與最後處理的相同，跳過重複處理');
-        return;
-      }
-      
-      console.log('頁面重整後檢測到新資料!');
-      console.log('舊雜湊:', lastDataSnapshot ? lastDataSnapshot.hash : 'null');
-      console.log('新雜湊:', currentHash);
-      console.log('資料筆數:', currentTableData.length);
-      
-      // 更新快照
-      updateDataSnapshot(currentTableData, currentPersonalInfo);
-      
-      // 觸發自動動作
-      triggerAutoActionAfterRefresh(currentTableData, currentPersonalInfo);
-      
-      // 記錄處理狀態
-      lastProcessedHash = currentHash;
-      lastProcessedTime = now;
-      
-      retryCount = 0; // 重置重試計數
-    } else {
-      console.log('頁面重整後資料無變化');
-      
-      // 更新快照時間，但不觸發動作
-      if (lastDataSnapshot) {
-        lastDataSnapshot.timestamp = new Date().toISOString();
-      }
-    }
-  } catch (error) {
-    console.error('檢查頁面重整後資料變化時發生錯誤:', error);
-    retryCount++;
-    
-    if (retryCount >= MONITOR_CONFIG.maxRetries) {
-      console.error('達到最大重試次數，暫停監測');
-      notifyUser('監測發生錯誤，已暫停', 'error');
-      stopPageRefreshMonitoring();
-    }
-  }
-}
-
-// 初始化資料快照
-function initializeDataSnapshot() {
-  try {
-    const tableData = extractTableData();
-    const personalInfo = getPersonalInfo();
-    
-    lastDataSnapshot = {
-      tableData: tableData,
-      personalInfo: personalInfo,
-      timestamp: new Date().toISOString(),
-      hash: generateDataHash(tableData, personalInfo)
-    };
-    
-    console.log('初始資料快照已建立:', lastDataSnapshot.hash);
-    console.log('初始資料筆數:', tableData ? tableData.length : 0);
-  } catch (error) {
-    console.error('初始化資料快照失敗:', error);
-  }
-}
-
-// 更新資料快照
-function updateDataSnapshot(tableData, personalInfo) {
-  lastDataSnapshot = {
-    tableData: tableData,
-    personalInfo: personalInfo,
-    timestamp: new Date().toISOString(),
-    hash: generateDataHash(tableData, personalInfo)
-  };
-}
-
-// 生成資料雜湊值
-function generateDataHash(tableData, personalInfo) {
-  const dataString = JSON.stringify({
-    tableCount: tableData ? tableData.length : 0,
-    tableData: tableData,
-    personalInfo: personalInfo,
-    url: window.location.href,
-    pageLoadTime: pageLoadTime // 加入頁面載入時間作為雜湊因子
-  });
-  
-  // 簡單的雜湊函數
-  let hash = 0;
-  for (let i = 0; i < dataString.length; i++) {
-    const char = dataString.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // 轉換為 32 位整數
-  }
-  return hash.toString();
-}
-
-// 設置 MutationObserver (輔助監測)
-function setupMutationObserver() {
-  if (mutationObserver) {
-    mutationObserver.disconnect();
-  }
-  
-  mutationObserver = new MutationObserver((mutations) => {
-    let hasSignificantChange = false;
-    
-    mutations.forEach((mutation) => {
-      // 檢查是否為重要的變化
-      if (isSignificantMutation(mutation)) {
-        hasSignificantChange = true;
-      }
-    });
-    
-    if (hasSignificantChange) {
-      console.log('檢測到重要的頁面變化 (輔助監測)');
-      debouncedDataCheck();
-    }
-  });
-  
-  // 開始觀察
-  mutationObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class', 'style', 'data-*']
-  });
-  
-  console.log('MutationObserver 已設置 (輔助監測)');
-}
-
-// 判斷是否為重要的變化
-function isSignificantMutation(mutation) {
-  // 忽略樣式變化
-  if (mutation.type === 'attributes' && 
-      (mutation.attributeName === 'style' || 
-       mutation.attributeName === 'class')) {
-    return false;
-  }
-  
-  // 檢查是否涉及表格或資料相關元素
-  const target = mutation.target;
-  if (target.nodeType === Node.ELEMENT_NODE) {
-    const tagName = target.tagName.toLowerCase();
-    const className = target.className || '';
-    
-    // 關注表格、資料容器等重要元素
-    if (tagName === 'table' || 
-        tagName === 'tbody' || 
-        tagName === 'tr' || 
-        tagName === 'td' ||
-        className.includes('dataTables') ||
-        className.includes('table') ||
-        className.includes('data')) {
-      return true;
-    }
-  }
-  
-  return false;
-}
-
-// 防抖的資料檢查
-function debouncedDataCheck() {
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-  }
-  
-  debounceTimer = setTimeout(() => {
-    checkForDataChangesAfterRefresh();
-  }, MONITOR_CONFIG.debounceDelay);
-}
-
-// 觸發頁面重整後的自動動作
-function triggerAutoActionAfterRefresh(tableData, personalInfo) {
-  console.log('觸發頁面重整後的自動動作...');
-  
-  try {
-    // 通知背景腳本有新資料
-    chrome.runtime.sendMessage({
-      action: 'dataChanged',
-      data: {
-        tableData: tableData,
-        personalInfo: personalInfo,
-        timestamp: new Date().toISOString(),
-        url: window.location.href,
-        trigger: 'page_refresh' // 標記觸發原因
-      }
-    });
-    
-    // 顯示通知
-    const dataCount = tableData ? tableData.length : 0;
-    notifyUser(`頁面重整後檢測到新資料！共 ${dataCount} 筆記錄`, 'success');
-    
-  } catch (error) {
-    console.error('觸發頁面重整後自動動作時發生錯誤:', error);
-    notifyUser('自動動作執行失敗', 'error');
-  }
-}
-
 // 顯示通知
 function notifyUser(message, type = 'info') {
   console.log(`[${type.toUpperCase()}] ${message}`);
@@ -456,8 +438,10 @@ function notifyUser(message, type = 'info') {
     color: white;
     font-weight: bold;
     z-index: 10000;
-    max-width: 300px;
+    max-width: 350px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    font-size: 14px;
+    line-height: 1.4;
   `;
   
   // 根據類型設置顏色
@@ -478,64 +462,22 @@ function notifyUser(message, type = 'info') {
   notification.textContent = message;
   document.body.appendChild(notification);
   
-  // 3秒後自動移除
+  // 根據類型設置不同的顯示時間
+  const displayTime = type === 'success' ? 5000 : 3000;
   setTimeout(() => {
     if (notification.parentNode) {
       notification.parentNode.removeChild(notification);
     }
-  }, 3000);
-}
-
-// 頁面載入事件監聽
-function setupPageLoadListeners() {
-  // 監聽頁面完全載入
-  if (document.readyState === 'complete') {
-    onPageFullyLoaded();
-  } else {
-    window.addEventListener('load', onPageFullyLoaded);
-  }
-  
-  // 監聽 DOM 載入完成
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', onDOMLoaded);
-  } else {
-    onDOMLoaded();
-  }
-}
-
-// DOM 載入完成處理
-function onDOMLoaded() {
-  console.log('DOM 載入完成');
-  
-  // 如果正在監測，檢查是否為重整後的載入
-  if (isMonitoring) {
-    setTimeout(() => {
-      checkIfPageRefreshed();
-    }, 1000);
-  }
-}
-
-// 頁面完全載入處理
-function onPageFullyLoaded() {
-  console.log('頁面完全載入完成');
-  
-  // 如果正在監測，進行更詳細的檢查
-  if (isMonitoring) {
-    setTimeout(() => {
-      checkForDataChangesAfterRefresh();
-    }, 2000);
-  }
+  }, displayTime);
 }
 
 // 初始化
 function initialize() {
-  console.log('醫療資料頁面監測工具已啟動 (頁面重整觸發版)');
+  console.log('醫療資料頁面監測工具已啟動 (URL 跳轉監測版)');
   
-  // 記錄頁面載入時間
-  pageLoadTime = Date.now();
-  
-  // 設置頁面載入監聽器
-  setupPageLoadListeners();
+  // 記錄初始 URL
+  currentUrl = window.location.href;
+  console.log('初始 URL:', currentUrl);
   
   // 在頁面載入完成後執行初始化
   if (document.readyState === 'loading') {
@@ -551,10 +493,14 @@ function initialize() {
       console.log('檢測到醫療資訊系統');
     }
     
-    // 如果是相關頁面，可以自動開始監測（可選）
+    // 如果是相關頁面，顯示可以開始監測的提示
     if (isRelevantPage()) {
-      console.log('檢測到相關頁面，可開始頁面重整監測');
-      // 注意：這裡不自動開始監測，讓用戶手動控制
+      console.log('檢測到相關頁面，可開始 URL 跳轉監測');
+      if (isOnTargetPage()) {
+        console.log('當前在目標頁面');
+      } else if (isOnStartPage()) {
+        console.log('當前在起始頁面');
+      }
     }
   }
 }
