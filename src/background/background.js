@@ -8,7 +8,16 @@ const NOTIFICATION_COOLDOWN = 5000; // 通知冷卻時間 5 秒
 
 // 使用 ImageData 直接操作像素數據來創建圖示
 // 適用於 service worker 環境
-function createMonitoringIcon() {
+
+// 監測狀態常數
+const ICON_STATUS = {
+  STOPPED: 'stopped',      // 紅色 - 停止監測
+  WAITING: 'waiting',      // 黃色 - 開始監測但尚未跳轉成功
+  SUCCESS: 'success'       // 綠色 - 跳轉成功
+};
+
+// 創建綠色成功圖示 (跳轉成功)
+function createSuccessIcon() {
   const size = 19;
   const data = new Uint8ClampedArray(size * size * 4); // RGBA 數據
   
@@ -53,6 +62,53 @@ function createMonitoringIcon() {
   return new ImageData(data, size, size);
 }
 
+// 創建黃色等待圖示 (開始監測但尚未跳轉成功)
+function createWaitingIcon() {
+  const size = 19;
+  const data = new Uint8ClampedArray(size * size * 4); // RGBA 數據
+  
+  // 創建一個 ImageData 對象
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const index = (y * size + x) * 4;
+      
+      // 計算像素到中心的距離
+      const distanceToCenter = Math.sqrt(Math.pow(x - size/2, 2) + Math.pow(y - size/2, 2));
+      
+      if (distanceToCenter <= size/2) {
+        // 黃色圓形背景 (#FFC107)
+        data[index] = 255;    // R
+        data[index + 1] = 193; // G
+        data[index + 2] = 7;   // B
+        data[index + 3] = 255; // A (完全不透明)
+        
+        // 繪製白色播放圖示 (三角形)
+        const trianglePoints = [
+          {x: 7, y: 6},
+          {x: 7, y: 13},
+          {x: 14, y: 9.5}
+        ];
+        
+        // 檢查點是否在三角形內
+        if (isPointInTriangle({x, y}, trianglePoints[0], trianglePoints[1], trianglePoints[2])) {
+          data[index] = 255;     // R
+          data[index + 1] = 255; // G
+          data[index + 2] = 255; // B
+        }
+      } else {
+        // 透明背景
+        data[index] = 0;
+        data[index + 1] = 0;
+        data[index + 2] = 0;
+        data[index + 3] = 0;
+      }
+    }
+  }
+  
+  return new ImageData(data, size, size);
+}
+
+// 創建紅色停止圖示 (停止監測)
 function createStoppedIcon() {
   const size = 19;
   const data = new Uint8ClampedArray(size * size * 4); // RGBA 數據
@@ -141,10 +197,10 @@ chrome.runtime.onInstalled.addListener(() => {
     lastProcessedData: null
   });
   
-  // 初始化設置停止狀態圖示
+  // 初始化設置停止狀態圖示 (紅色)
   const imageData = createStoppedIcon();
   chrome.action.setIcon({ imageData });
-  console.log('初始化設置圖示為停止狀態');
+  console.log('初始化設置圖示為停止狀態 (紅色)');
 });
 
 // 監聽來自內容腳本的消息
@@ -176,7 +232,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       
     case 'startMonitoring':
       console.log(`標籤頁 ${sender.tab.id} 開始監測`);
-      updateMonitoringStatus(sender.tab.id, { isMonitoring: true });
+      // 開始監測時設置為等待狀態（黃色），jumpSuccess 為 false
+      updateMonitoringStatus(sender.tab.id, { 
+        isMonitoring: true, 
+        jumpSuccess: false 
+      });
       sendResponse({ success: true });
       break;
       
@@ -185,6 +245,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       monitoringTabs.delete(sender.tab.id);
       // 檢查是否還有其他標籤頁在監測中
       if (monitoringTabs.size === 0) {
+        // 停止監測時設置為紅色
         const imageData = createStoppedIcon();
         chrome.action.setIcon({ imageData });
       }
@@ -254,6 +315,9 @@ async function handleDataChanged(data, tabId) {
     // 檢查是否啟用自動儲存
     const settings = await chrome.storage.local.get(['autoSave', 'notificationEnabled']);
     
+    // 檢查是否為跳轉成功的觸發
+    const isJumpSuccess = data.trigger === 'url_jump';
+    
     if (settings.autoSave !== false) { // 預設啟用
       console.log('自動儲存已啟用，開始儲存資料...');
       
@@ -285,12 +349,15 @@ async function handleDataChanged(data, tabId) {
           }
         }
         
-        // 更新監測狀態
+        // 更新監測狀態，如果是跳轉成功，設置 jumpSuccess 為 true（綠色）
         updateMonitoringStatus(tabId, {
           lastActivity: data.timestamp,
           lastDataCount: data.tableData.length,
-          totalProcessed: (monitoringTabs.get(tabId)?.totalProcessed || 0) + 1
+          totalProcessed: (monitoringTabs.get(tabId)?.totalProcessed || 0) + 1,
+          jumpSuccess: isJumpSuccess // 跳轉成功時設為 true，顯示綠色圖示
         });
+        
+        console.log(`圖示狀態更新: ${isJumpSuccess ? '跳轉成功(綠色)' : '一般監測(黃色)'}`);
         
       } else {
         console.error('自動儲存失敗:', saveResult.error);
@@ -298,6 +365,14 @@ async function handleDataChanged(data, tabId) {
       }
     } else {
       console.log('自動儲存已停用，僅顯示通知');
+      
+      // 即使不儲存資料，也更新監測狀態和圖示
+      updateMonitoringStatus(tabId, {
+        lastActivity: data.timestamp,
+        jumpSuccess: isJumpSuccess // 跳轉成功時設為 true，顯示綠色圖示
+      });
+      
+      console.log(`圖示狀態更新: ${isJumpSuccess ? '跳轉成功(綠色)' : '一般監測(黃色)'}`);
       
       if (settings.notificationEnabled !== false) {
         const now = Date.now();
@@ -578,19 +653,25 @@ function updateMonitoringStatus(tabId, status) {
 // 更新瀏覽器圖示狀態
 function updateBrowserIcon(tabId, status) {
   try {
-    // 檢查是否有監測狀態
-    const isMonitoring = status && monitoringTabs.has(tabId);
+    // 檢查監測狀態
+    const tabStatus = monitoringTabs.get(tabId);
+    const isMonitoring = status && tabStatus;
     
     // 根據監測狀態設置圖示
-    if (isMonitoring) {
-      console.log(`設置標籤頁 ${tabId} 的圖示為監測中狀態`);
-      // 使用 Canvas API 動態生成綠色播放圖示
-      const imageData = createMonitoringIcon();
+    if (!isMonitoring) {
+      // 停止監測 - 紅色
+      console.log(`設置標籤頁 ${tabId} 的圖示為停止狀態 (紅色)`);
+      const imageData = createStoppedIcon();
+      chrome.action.setIcon({ imageData });
+    } else if (tabStatus.jumpSuccess) {
+      // 跳轉成功 - 綠色
+      console.log(`設置標籤頁 ${tabId} 的圖示為跳轉成功狀態 (綠色)`);
+      const imageData = createSuccessIcon();
       chrome.action.setIcon({ imageData });
     } else {
-      console.log(`設置標籤頁 ${tabId} 的圖示為停止狀態`);
-      // 使用 Canvas API 動態生成紅色停止圖示
-      const imageData = createStoppedIcon();
+      // 開始監測但尚未跳轉成功 - 黃色
+      console.log(`設置標籤頁 ${tabId} 的圖示為等待跳轉狀態 (黃色)`);
+      const imageData = createWaitingIcon();
       chrome.action.setIcon({ imageData });
     }
   } catch (error) {
@@ -614,10 +695,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     
     // 檢查是否還有其他標籤頁在監測中
     if (monitoringTabs.size === 0) {
-      // 所有監測標籤頁都已關閉，設置為停止狀態
+      // 所有監測標籤頁都已關閉，設置為停止狀態 (紅色)
       const imageData = createStoppedIcon();
       chrome.action.setIcon({ imageData });
-      console.log('所有監測標籤頁已關閉，設置圖示為停止狀態');
+      console.log('所有監測標籤頁已關閉，設置圖示為停止狀態 (紅色)');
     }
   }
 });
