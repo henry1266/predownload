@@ -77,7 +77,7 @@ function updateMonitoringStatus(status) {
       pageStatus.className = 'page-status target';
     } else if (status.isOnStartPage) {
       statusText.textContent = '正在監測 URL 跳轉';
-      pageStatus.textContent = '起始頁面 - 等待跳轉到目標頁面';
+      pageStatus.textContent = '健保雲端首頁 - 等待過卡';
       pageStatus.className = 'page-status waiting';
     } else if (currentTabInfo && currentTabInfo.url.includes('medcloud2.nhi.gov.tw')) {
       statusText.textContent = '正在監測 URL 跳轉';
@@ -106,7 +106,7 @@ function updateMonitoringStatus(status) {
         pageStatus.textContent = '目標頁面 - 可開始監測跳轉事件';
         pageStatus.className = 'page-status target';
       } else if (isStartUrl(currentTabInfo.url)) {
-        pageStatus.textContent = '起始頁面 - 可開始監測跳轉事件';
+        pageStatus.textContent = '健保雲端首頁 - 可開始監測跳轉事件';
         pageStatus.className = 'page-status start';
       } else if (isRelevantUrl(currentTabInfo.url)) {
         pageStatus.textContent = '相關頁面 - 可開始監測跳轉事件';
