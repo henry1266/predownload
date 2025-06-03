@@ -8,7 +8,7 @@ const MONITOR_CONFIG = {
   urlCheckInterval: 500,    // URL 檢查間隔 (毫秒)
   dataCheckDelay: 2000,     // 跳轉後延遲檢查資料的時間
   maxRetries: 3,            // 最大重試次數
-  cooldownPeriod: 5000,     // 冷卻期間 (5秒)
+  cooldownPeriod: 10000,     // 冷卻期間 (10秒) - 增加避免重複觸發
   persistenceKey: 'monitoring_state' // 持久化狀態的鍵值
 };
 
@@ -475,22 +475,8 @@ function triggerAutoActionAfterJump(tableData, personalInfo) {
       }
     });
     
-    // 同時嘗試直接觸發手動擷取作為備用方案
-    console.log('同時觸發備用擷取方案...');
-    setTimeout(() => {
-      chrome.runtime.sendMessage({ action: 'captureAndExtract' }, function(backupResponse) {
-        if (chrome.runtime.lastError) {
-          console.error('備用擷取方案失敗:', chrome.runtime.lastError);
-          return;
-        }
-        
-        console.log('備用擷取方案回應:', backupResponse);
-        
-        if (backupResponse && backupResponse.success) {
-          console.log('備用擷取方案成功');
-        }
-      });
-    }, 1000); // 延遲 1 秒執行備用方案
+    // 移除備用擷取方案，避免重複觸發
+    console.log('主要擷取方案已執行，不再執行備用方案');
     
   } catch (error) {
     console.error('觸發跳轉後自動動作時發生錯誤:', error);
