@@ -14,7 +14,7 @@
                 <img src="../../assets/icon48.png" alt="圖示" class="icon">
                 <h1>醫療資料監測工具</h1>
             </div>
-            <div class="version">v2.0.0</div>
+            <div class="version">v2.0.2</div>
         </div>
 
         <!-- 頁面資訊區域 -->
@@ -55,10 +55,17 @@
                 <span class="btn-text" id="monitorBtnText">開始監測</span>
             </button>
             
-            <button class="capture-btn" id="captureBtn">
-                <span class="btn-icon">📋</span>
-                <span class="btn-text">手動擷取</span>
-            </button>
+            <div class="button-row">
+                <button class="capture-btn" id="captureBtn">
+                    <span class="btn-icon">📋</span>
+                    <span class="btn-text">手動擷取</span>
+                </button>
+                
+                <button class="refresh-btn" id="refreshBtn">
+                    <span class="btn-icon">🔄</span>
+                    <span class="btn-text">重新整理</span>
+                </button>
+            </div>
         </div>
 
         <!-- 處理狀態面板 -->
@@ -72,12 +79,13 @@
         <!-- 說明區域 -->
         <div class="help-section">
             <div class="help-text">
-                <strong>使用說明：</strong>
+                <strong>頁面重整觸發模式：</strong>
                 <ul>
-                    <li><strong>起始頁面</strong>：在失敗頁面 (/#) 開始監測頁面跳轉</li>
-                    <li><strong>目標頁面</strong>：在成功頁面 (/IMUE0008) 監測資料變化</li>
-                    <li><strong>自動觸發</strong>：檢測到新資料時自動擷取並儲存</li>
-                    <li><strong>手動擷取</strong>：隨時可手動執行資料擷取</li>
+                    <li><strong>開始監測</strong>：點擊「開始監測」啟用頁面重整監測</li>
+                    <li><strong>重新整理</strong>：手動重新整理頁面或等待頁面自動重新載入</li>
+                    <li><strong>自動檢測</strong>：頁面重整完成後自動檢查是否有新資料</li>
+                    <li><strong>自動擷取</strong>：檢測到新資料時自動擷取並儲存</li>
+                    <li><strong>手動操作</strong>：隨時可使用「手動擷取」或「重新整理」按鈕</li>
                 </ul>
             </div>
         </div>
