@@ -204,7 +204,9 @@ function isUrlStartPage(url) {
 // 成功跳轉後檢查資料
 function checkDataAfterSuccessfulJump() {
   try {
-    console.log('成功跳轉到目標頁面，開始檢查資料...');
+    console.log('=== 開始檢查跳轉後的資料 ===');
+    console.log('當前 URL:', window.location.href);
+    console.log('是否在目標頁面:', isOnTargetPage());
     
     // 檢查是否在冷卻期間
     const now = Date.now();
@@ -215,17 +217,23 @@ function checkDataAfterSuccessfulJump() {
       return;
     }
 
+    console.log('開始擷取表格資料...');
     const currentTableData = extractTableData();
+    console.log('表格資料擷取結果:', currentTableData ? `${currentTableData.length} 筆` : '無資料');
+    
+    console.log('開始擷取個人資料...');
     const currentPersonalInfo = getPersonalInfo();
+    console.log('個人資料擷取結果:', currentPersonalInfo ? '已擷取' : '無資料');
     
     // 檢查是否有實際資料
     if (!currentTableData || currentTableData.length === 0) {
-      console.log('跳轉後未找到資料，可能頁面還在載入中');
+      console.log('跳轉後未找到表格資料，可能頁面還在載入中');
       
       // 重試機制
       retryCount++;
       if (retryCount < MONITOR_CONFIG.maxRetries) {
         console.log(`重試檢查資料 (${retryCount}/${MONITOR_CONFIG.maxRetries})`);
+        notifyUser(`重試檢查資料 (${retryCount}/${MONITOR_CONFIG.maxRetries})`, 'info');
         setTimeout(() => {
           if (isMonitoring && isOnTargetPage()) {
             checkDataAfterSuccessfulJump();
@@ -233,12 +241,17 @@ function checkDataAfterSuccessfulJump() {
         }, 2000);
       } else {
         console.log('達到最大重試次數，跳過此次檢查');
+        notifyUser('達到最大重試次數，未找到資料', 'warning');
         retryCount = 0;
       }
       return;
     }
     
+    console.log('找到表格資料，開始比較雜湊值...');
     const currentHash = generateDataHash(currentTableData, currentPersonalInfo);
+    console.log('當前資料雜湊:', currentHash);
+    console.log('上次快照雜湊:', lastDataSnapshot ? lastDataSnapshot.hash : 'null');
+    console.log('上次處理雜湊:', lastProcessedHash || 'null');
     
     // 比較雜湊值
     if (!lastDataSnapshot || currentHash !== lastDataSnapshot.hash) {
@@ -249,7 +262,7 @@ function checkDataAfterSuccessfulJump() {
         return;
       }
       
-      console.log('跳轉後檢測到新資料!');
+      console.log('🎉 跳轉後檢測到新資料!');
       console.log('舊雜湊:', lastDataSnapshot ? lastDataSnapshot.hash : 'null');
       console.log('新雜湊:', currentHash);
       console.log('資料筆數:', currentTableData.length);
@@ -258,6 +271,7 @@ function checkDataAfterSuccessfulJump() {
       updateDataSnapshot(currentTableData, currentPersonalInfo);
       
       // 觸發自動動作
+      console.log('準備觸發自動動作...');
       triggerAutoActionAfterJump(currentTableData, currentPersonalInfo);
       
       // 記錄處理狀態
@@ -274,6 +288,8 @@ function checkDataAfterSuccessfulJump() {
         lastDataSnapshot.timestamp = new Date().toISOString();
       }
     }
+    
+    console.log('=== 資料檢查完成 ===');
   } catch (error) {
     console.error('檢查跳轉後資料時發生錯誤:', error);
     retryCount++;
@@ -282,6 +298,13 @@ function checkDataAfterSuccessfulJump() {
       console.error('達到最大重試次數');
       notifyUser('資料檢查發生錯誤', 'error');
       retryCount = 0;
+    } else {
+      console.log(`發生錯誤，將重試 (${retryCount}/${MONITOR_CONFIG.maxRetries})`);
+      setTimeout(() => {
+        if (isMonitoring && isOnTargetPage()) {
+          checkDataAfterSuccessfulJump();
+        }
+      }, 2000);
     }
   }
 }
@@ -319,10 +342,21 @@ function generateDataHash(tableData, personalInfo) {
 // 觸發跳轉後的自動動作
 function triggerAutoActionAfterJump(tableData, personalInfo) {
   console.log('觸發跳轉後的自動動作...');
+  console.log('表格資料筆數:', tableData ? tableData.length : 0);
+  console.log('個人資料:', personalInfo ? '已擷取' : '未擷取');
   
   try {
+    // 檢查資料是否有效
+    if (!tableData || tableData.length === 0) {
+      console.warn('沒有有效的表格資料，跳過自動動作');
+      notifyUser('跳轉成功但未找到資料', 'warning');
+      return;
+    }
+    
+    console.log('準備發送 dataChanged 訊息到背景腳本...');
+    
     // 通知背景腳本有新資料
-    chrome.runtime.sendMessage({
+    const messageData = {
       action: 'dataChanged',
       data: {
         tableData: tableData,
@@ -333,15 +367,50 @@ function triggerAutoActionAfterJump(tableData, personalInfo) {
         jumpCount: jumpCount,
         successfulJumps: successfulJumps
       }
+    };
+    
+    console.log('發送訊息:', messageData);
+    
+    chrome.runtime.sendMessage(messageData, function(response) {
+      if (chrome.runtime.lastError) {
+        console.error('發送 dataChanged 訊息失敗:', chrome.runtime.lastError);
+        notifyUser('自動處理失敗: 通信錯誤', 'error');
+        return;
+      }
+      
+      console.log('dataChanged 訊息發送成功，背景腳本回應:', response);
+      
+      if (response && response.success) {
+        console.log('背景腳本確認處理成功');
+        // 顯示成功通知
+        const dataCount = tableData ? tableData.length : 0;
+        notifyUser(`跳轉後自動擷取完成！共 ${dataCount} 筆記錄 (第 ${successfulJumps} 次成功跳轉)`, 'success');
+      } else {
+        console.error('背景腳本處理失敗:', response);
+        notifyUser('自動處理失敗', 'error');
+      }
     });
     
-    // 顯示通知
-    const dataCount = tableData ? tableData.length : 0;
-    notifyUser(`跳轉後檢測到新資料！共 ${dataCount} 筆記錄 (第 ${successfulJumps} 次成功跳轉)`, 'success');
+    // 同時嘗試直接觸發手動擷取作為備用方案
+    console.log('同時觸發備用擷取方案...');
+    setTimeout(() => {
+      chrome.runtime.sendMessage({ action: 'captureAndExtract' }, function(backupResponse) {
+        if (chrome.runtime.lastError) {
+          console.error('備用擷取方案失敗:', chrome.runtime.lastError);
+          return;
+        }
+        
+        console.log('備用擷取方案回應:', backupResponse);
+        
+        if (backupResponse && backupResponse.success) {
+          console.log('備用擷取方案成功');
+        }
+      });
+    }, 1000); // 延遲 1 秒執行備用方案
     
   } catch (error) {
     console.error('觸發跳轉後自動動作時發生錯誤:', error);
-    notifyUser('自動動作執行失敗', 'error');
+    notifyUser('自動動作執行失敗: ' + error.message, 'error');
   }
 }
 

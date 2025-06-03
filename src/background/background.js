@@ -176,6 +176,8 @@ async function handleDataChanged(data, tabId) {
 // 儲存擷取的資料
 async function saveExtractedData(extractedData, tabId) {
   try {
+    console.log('開始儲存擷取的資料...');
+    
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const dateStr = new Date().toLocaleDateString('zh-TW').replace(/\//g, '');
     
@@ -197,11 +199,12 @@ async function saveExtractedData(extractedData, tabId) {
     }
     
     // 準備 CSV 資料
+    console.log('準備 CSV 資料...');
     const csvData = convertToCSV(extractedData.tableData, extractedData.personalInfo);
-    const csvBlob = new Blob([csvData], { type: 'text/csv;charset=utf-8' });
     const csvFilename = `${filePrefix}_${dateStr}_${timestamp}.csv`;
     
     // 準備 JSON 資料
+    console.log('準備 JSON 資料...');
     const jsonData = {
       metadata: {
         extractedAt: extractedData.timestamp || new Date().toISOString(),
@@ -210,38 +213,46 @@ async function saveExtractedData(extractedData, tabId) {
           title: tabInfo.title
         },
         dataCount: extractedData.tableData ? extractedData.tableData.length : 0,
-        version: '2.0.0'
+        version: '2.0.4'
       },
       personalInfo: extractedData.personalInfo,
       tableData: extractedData.tableData
     };
     
-    const jsonBlob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json;charset=utf-8' });
     const jsonFilename = `${filePrefix}_${dateStr}_${timestamp}.json`;
     
-    // 下載 CSV 檔案
-    const csvUrl = URL.createObjectURL(csvBlob);
-    await chrome.downloads.download({
-      url: csvUrl,
-      filename: csvFilename,
-      saveAs: false
-    });
+    // 使用 Data URL 方式下載檔案（相容 Service Worker）
+    console.log('使用 Data URL 方式下載 CSV 檔案...');
+    const csvDataUrl = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
     
-    // 下載 JSON 檔案
-    const jsonUrl = URL.createObjectURL(jsonBlob);
-    await chrome.downloads.download({
-      url: jsonUrl,
-      filename: jsonFilename,
-      saveAs: false
-    });
+    try {
+      await chrome.downloads.download({
+        url: csvDataUrl,
+        filename: csvFilename,
+        saveAs: false
+      });
+      console.log('CSV 檔案下載成功:', csvFilename);
+    } catch (csvError) {
+      console.error('CSV 檔案下載失敗:', csvError);
+      throw new Error('CSV 檔案下載失敗: ' + csvError.message);
+    }
     
-    // 清理 URL 物件
-    setTimeout(() => {
-      URL.revokeObjectURL(csvUrl);
-      URL.revokeObjectURL(jsonUrl);
-    }, 1000);
+    console.log('使用 Data URL 方式下載 JSON 檔案...');
+    const jsonDataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(jsonData, null, 2));
     
-    console.log('檔案儲存成功:', csvFilename, jsonFilename);
+    try {
+      await chrome.downloads.download({
+        url: jsonDataUrl,
+        filename: jsonFilename,
+        saveAs: false
+      });
+      console.log('JSON 檔案下載成功:', jsonFilename);
+    } catch (jsonError) {
+      console.error('JSON 檔案下載失敗:', jsonError);
+      throw new Error('JSON 檔案下載失敗: ' + jsonError.message);
+    }
+    
+    console.log('所有檔案儲存成功');
     
     // 儲存到本地存儲（用於歷史記錄）
     const historyData = {
@@ -266,6 +277,8 @@ async function saveExtractedData(extractedData, tabId) {
       extractionHistory: history,
       lastExtraction: historyData
     });
+    
+    console.log('歷史記錄已更新');
     
     return { 
       success: true, 

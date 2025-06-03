@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "醫療資料頁面監測工具",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "監測醫療系統頁面變化並自動執行資料擷取動作",
   "permissions": [
     "activeTab",
