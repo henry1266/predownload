@@ -178,7 +178,7 @@ async function saveExtractedData(extractedData, tabId) {
   try {
     console.log('開始儲存擷取的資料...');
     
-    // 生成時間戳記（yyyy:mm:dd_hh:mm:ss 格式）
+    // 生成時間戳記（yyyy-mm-dd_hh-mm-ss 格式）
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -198,27 +198,32 @@ async function saveExtractedData(extractedData, tabId) {
       tabInfo = { url: 'unknown', title: 'unknown' };
     }
     
-    // 生成檔案名稱和資料夾
-    let baseName = '醫療資料';
-    if (tabInfo.title && tabInfo.title.includes('健保')) {
-      baseName = '健保醫療資料';
-    } else if (tabInfo.url && tabInfo.url.includes('medcloud')) {
-      baseName = '健保雲端資料';
+    // 從個人資料中獲取姓名
+    let personName = '未知姓名';
+    if (extractedData.personalInfo && extractedData.personalInfo.name) {
+      personName = extractedData.personalInfo.name;
+    } else {
+      // 嘗試從其他可能的欄位獲取姓名
+      const personalInfo = extractedData.personalInfo || {};
+      const possibleNameFields = ['姓名', 'name', 'userName', 'patientName', '病患姓名'];
+      
+      for (const field of possibleNameFields) {
+        if (personalInfo[field] && personalInfo[field].trim() !== '') {
+          personName = personalInfo[field].trim();
+          break;
+        }
+      }
     }
     
-    // 資料夾名稱：yyyy:mm:dd_hh:mm:ss_{name}
-    const folderName = `${timeStamp}_${baseName}`;
+    // 清理檔案名稱中的無效字符
+    personName = personName.replace(/[<>:"/\\|?*]/g, '_').trim();
+    if (personName === '' || personName === '_') {
+      personName = '未知姓名';
+    }
     
-    // 檔案名稱
-    const csvFilename = `${folderName}/data.csv`;
-    const jsonFilename = `${folderName}/data.json`;
-    const infoFilename = `${folderName}/info.txt`;
+    // JSON 檔案名稱：時間戳記_姓名.json
+    const jsonFilename = `${timeStamp}_${personName}.json`;
     
-    // 準備 CSV 資料
-    console.log('準備 CSV 資料...');
-    const csvData = convertToCSV(extractedData.tableData, extractedData.personalInfo);
-    
-    // 準備 JSON 資料
     console.log('準備 JSON 資料...');
     const jsonData = {
       metadata: {
@@ -228,51 +233,15 @@ async function saveExtractedData(extractedData, tabId) {
           title: tabInfo.title
         },
         dataCount: extractedData.tableData ? extractedData.tableData.length : 0,
-        version: '2.0.5',
-        folderName: folderName
+        version: '2.0.7',
+        filename: jsonFilename,
+        personName: personName
       },
       personalInfo: extractedData.personalInfo,
       tableData: extractedData.tableData
     };
     
-    // 準備資訊檔案
-    const infoData = `擷取資訊
-================
-擷取時間: ${new Date().toLocaleString('zh-TW')}
-資料來源: ${tabInfo.url}
-頁面標題: ${tabInfo.title}
-資料筆數: ${extractedData.tableData ? extractedData.tableData.length : 0}
-工具版本: 2.0.5
-資料夾名稱: ${folderName}
-
-檔案說明:
-- data.csv: 表格資料（CSV 格式）
-- data.json: 完整資料（JSON 格式）
-- info.txt: 擷取資訊（此檔案）
-
-個人資料:
-${extractedData.personalInfo ? Object.entries(extractedData.personalInfo)
-  .map(([key, value]) => `- ${key}: ${value}`)
-  .join('\n') : '- 無個人資料'}
-`;
-    
-    // 使用 Data URL 方式下載檔案到資料夾
-    console.log('下載 CSV 檔案到資料夾:', csvFilename);
-    const csvDataUrl = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
-    
-    try {
-      await chrome.downloads.download({
-        url: csvDataUrl,
-        filename: csvFilename,
-        saveAs: false
-      });
-      console.log('CSV 檔案下載成功:', csvFilename);
-    } catch (csvError) {
-      console.error('CSV 檔案下載失敗:', csvError);
-      throw new Error('CSV 檔案下載失敗: ' + csvError.message);
-    }
-    
-    console.log('下載 JSON 檔案到資料夾:', jsonFilename);
+    console.log('下載 JSON 檔案:', jsonFilename);
     const jsonDataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(jsonData, null, 2));
     
     try {
@@ -287,31 +256,16 @@ ${extractedData.personalInfo ? Object.entries(extractedData.personalInfo)
       throw new Error('JSON 檔案下載失敗: ' + jsonError.message);
     }
     
-    console.log('下載資訊檔案到資料夾:', infoFilename);
-    const infoDataUrl = 'data:text/plain;charset=utf-8,' + encodeURIComponent(infoData);
-    
-    try {
-      await chrome.downloads.download({
-        url: infoDataUrl,
-        filename: infoFilename,
-        saveAs: false
-      });
-      console.log('資訊檔案下載成功:', infoFilename);
-    } catch (infoError) {
-      console.error('資訊檔案下載失敗:', infoError);
-      // 資訊檔案失敗不影響主要功能
-      console.warn('資訊檔案下載失敗，但主要檔案已成功下載');
-    }
-    
-    console.log('所有檔案儲存成功到資料夾:', folderName);
+    console.log('檔案儲存成功:', jsonFilename);
     
     // 儲存到本地存儲（用於歷史記錄）
     const historyData = {
       timestamp: extractedData.timestamp || new Date().toISOString(),
       dataCount: extractedData.tableData ? extractedData.tableData.length : 0,
       source: tabInfo.url,
-      folderName: folderName,
-      files: [csvFilename, jsonFilename, infoFilename]
+      filename: jsonFilename,
+      personName: personName,
+      files: [jsonFilename]
     };
     
     // 獲取現有歷史記錄
@@ -334,8 +288,9 @@ ${extractedData.personalInfo ? Object.entries(extractedData.personalInfo)
     
     return { 
       success: true, 
-      folderName: folderName,
-      files: [csvFilename, jsonFilename, infoFilename],
+      filename: jsonFilename,
+      personName: personName,
+      files: [jsonFilename],
       dataCount: extractedData.tableData ? extractedData.tableData.length : 0
     };
     
