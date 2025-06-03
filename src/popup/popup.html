@@ -1,87 +1,96 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>醫療資料頁面監測工具</title>
-  <link rel="stylesheet" href="popup.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>醫療資料頁面監測工具</title>
+    <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>醫療資料頁面監測工具</h1>
-      <div class="version">v2.0.0</div>
-    </header>
-    
-    <main>
-      <!-- 監測狀態面板 -->
-      <div class="monitor-panel">
-        <div class="monitor-status" id="monitorStatus">
-          <div class="status-indicator" id="statusIndicator">
-            <span class="status-dot" id="statusDot"></span>
-            <span class="status-text" id="statusText">檢查中...</span>
-          </div>
-          <div class="monitor-info" id="monitorInfo" style="display: none;">
-            <div class="info-item">
-              <span class="label">開始時間:</span>
-              <span class="value" id="startTime">--</span>
+    <div class="container">
+        <!-- 標題區域 -->
+        <div class="header">
+            <div class="logo">
+                <img src="../../assets/icon48.png" alt="圖示" class="icon">
+                <h1>醫療資料監測工具</h1>
             </div>
-            <div class="info-item">
-              <span class="label">最後活動:</span>
-              <span class="value" id="lastActivity">--</span>
+            <div class="version">v2.0.0</div>
+        </div>
+
+        <!-- 頁面資訊區域 -->
+        <div class="page-info general" id="pageInfo">
+            <div class="page-info-label">當前頁面</div>
+            <div class="page-url" id="urlDisplay">載入中...</div>
+        </div>
+
+        <!-- 監測狀態區域 -->
+        <div class="status-section">
+            <div class="status-header">
+                <div class="status-indicator">
+                    <div class="status-dot inactive" id="statusDot"></div>
+                    <span class="status-text" id="statusText">監測已停止</span>
+                </div>
             </div>
-          </div>
+            
+            <!-- 頁面狀態 -->
+            <div class="page-status ready" id="pageStatus">準備就緒</div>
+            
+            <!-- 監測資訊 -->
+            <div class="monitor-info" id="monitorInfo" style="display: none;">
+                <div class="info-row">
+                    <span class="info-label">開始時間:</span>
+                    <span class="info-value" id="startTime">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">最後活動:</span>
+                    <span class="info-value" id="lastActivity">--</span>
+                </div>
+            </div>
         </div>
-        
-        <div class="monitor-controls">
-          <button id="toggleMonitorBtn" class="monitor-btn" disabled>
-            <span class="icon" id="monitorIcon">⏸️</span>
-            <span class="text" id="monitorBtnText">載入中...</span>
-          </button>
+
+        <!-- 控制按鈕區域 -->
+        <div class="controls">
+            <button class="monitor-btn" id="toggleMonitorBtn">
+                <span class="btn-icon" id="monitorIcon">▶️</span>
+                <span class="btn-text" id="monitorBtnText">開始監測</span>
+            </button>
+            
+            <button class="capture-btn" id="captureBtn">
+                <span class="btn-icon">📋</span>
+                <span class="btn-text">手動擷取</span>
+            </button>
         </div>
-      </div>
-      
-      <!-- 分隔線 -->
-      <div class="divider"></div>
-      
-      <!-- 手動操作面板 -->
-      <div class="action-panel">
-        <h3>手動操作</h3>
-        <button id="captureBtn" class="primary-btn">
-          <span class="icon">📷</span>
-          截圖並擷取資料
-        </button>
-      </div>
-      
-      <!-- 狀態面板 -->
-      <div class="status-panel" id="statusPanel" style="display: none;">
-        <div class="status-message" id="statusMessage">處理中...</div>
-        <div class="progress-bar">
-          <div class="progress" id="progressBar"></div>
+
+        <!-- 處理狀態面板 -->
+        <div class="status-panel" id="statusPanel" style="display: none;">
+            <div class="status-message" id="statusMessage">處理中...</div>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
         </div>
-      </div>
-      
-      <!-- 目標網址資訊 -->
-      <div class="target-info">
-        <h4>監測目標</h4>
-        <div class="target-url">
-          https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008
+
+        <!-- 說明區域 -->
+        <div class="help-section">
+            <div class="help-text">
+                <strong>使用說明：</strong>
+                <ul>
+                    <li><strong>起始頁面</strong>：在失敗頁面 (/#) 開始監測頁面跳轉</li>
+                    <li><strong>目標頁面</strong>：在成功頁面 (/IMUE0008) 監測資料變化</li>
+                    <li><strong>自動觸發</strong>：檢測到新資料時自動擷取並儲存</li>
+                    <li><strong>手動擷取</strong>：隨時可手動執行資料擷取</li>
+                </ul>
+            </div>
         </div>
-        <div class="target-note">
-          當此網址的頁面被刷新且檢測到新資料時，工具會自動執行擷取動作
+
+        <!-- 底部連結 -->
+        <div class="footer">
+            <a href="#" id="helpLink" class="footer-link">使用說明</a>
+            <span class="separator">|</span>
+            <a href="#" id="settingsLink" class="footer-link">設定</a>
         </div>
-      </div>
-    </main>
-    
-    <footer>
-      <div class="footer-links">
-        <a href="#" id="helpLink">說明</a>
-        <a href="#" id="settingsLink">設定</a>
-      </div>
-    </footer>
-  </div>
-  
-  <script src="popup.js"></script>
+    </div>
+
+    <script src="popup.js"></script>
 </body>
 </html>
 

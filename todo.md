@@ -24,7 +24,7 @@
 - [x] 優化效能和穩定性
 
 ## 第五階段：設定 Git 並上傳到新倉庫
-- [ ] 初始化 Git 倉庫
-- [ ] 設定 GitHub 認證
-- [ ] 上傳到 https://github.com/henry1266/predownload.git
+- [x] 初始化 Git 倉庫
+- [x] 設定 GitHub 認證
+- [x] 上傳到 https://github.com/henry1266/predownload.git
 

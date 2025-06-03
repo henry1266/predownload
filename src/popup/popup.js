@@ -1,25 +1,20 @@
-// 頁面監測版本 - 彈出視窗腳本
-// 處理監測功能的使用者介面互動
+// 頁面監測版本 - 彈出視窗腳本 (修正版)
+// 處理監測功能的使用者介面互動，支援頁面跳轉監測
 
 // 全域變數
 let currentTabId = null;
 let monitoringStatus = false;
 let statusCheckInterval = null;
+let currentTabInfo = null;
 
 // 格式化錯誤訊息的輔助函數
 function formatErrorMessage(error) {
   if (!error) return '未知錯誤';
   
-  // 如果是字符串，直接返回
   if (typeof error === 'string') return error;
-  
-  // 如果是Error對象，返回message屬性
   if (error instanceof Error) return error.message;
-  
-  // 如果是對象且有message屬性
   if (error.message) return error.message;
   
-  // 如果是其他對象，嘗試JSON序列化
   try {
     return JSON.stringify(error);
   } catch (e) {
@@ -49,12 +44,12 @@ function formatTime(isoString) {
   const now = new Date();
   const diff = now - date;
   
-  if (diff < 60000) { // 小於1分鐘
+  if (diff < 60000) {
     return '剛剛';
-  } else if (diff < 3600000) { // 小於1小時
+  } else if (diff < 3600000) {
     const minutes = Math.floor(diff / 60000);
     return `${minutes} 分鐘前`;
-  } else if (diff < 86400000) { // 小於1天
+  } else if (diff < 86400000) {
     const hours = Math.floor(diff / 3600000);
     return `${hours} 小時前`;
   } else {
@@ -72,15 +67,34 @@ function updateMonitoringStatus(status) {
   const toggleBtn = document.getElementById('toggleMonitorBtn');
   const monitorIcon = document.getElementById('monitorIcon');
   const monitorBtnText = document.getElementById('monitorBtnText');
+  const pageStatus = document.getElementById('pageStatus');
   
   if (status.isMonitoring) {
     // 監測中
     statusDot.className = 'status-dot active';
-    statusText.textContent = '正在監測頁面變化';
     monitorInfo.style.display = 'block';
     
+    // 根據頁面狀態顯示不同的監測狀態
+    if (status.isOnTargetPage) {
+      statusText.textContent = '正在監測資料變化';
+      pageStatus.textContent = '目標頁面 - 監測資料變化';
+      pageStatus.className = 'page-status target';
+    } else if (status.isOnStartPage) {
+      statusText.textContent = '正在監測頁面跳轉';
+      pageStatus.textContent = '起始頁面 - 等待跳轉到目標頁面';
+      pageStatus.className = 'page-status waiting';
+    } else if (currentTabInfo && currentTabInfo.url.includes('medcloud2.nhi.gov.tw')) {
+      statusText.textContent = '正在監測相關頁面';
+      pageStatus.textContent = '相關頁面 - 通用監測模式';
+      pageStatus.className = 'page-status related';
+    } else {
+      statusText.textContent = '正在監測頁面變化';
+      pageStatus.textContent = '一般頁面 - 通用監測模式';
+      pageStatus.className = 'page-status general';
+    }
+    
     startTime.textContent = formatTime(status.startTime);
-    lastActivity.textContent = formatTime(status.lastActivity);
+    lastActivity.textContent = formatTime(status.lastActivity || status.lastProcessed);
     
     toggleBtn.className = 'monitor-btn stop';
     toggleBtn.disabled = false;
@@ -93,6 +107,26 @@ function updateMonitoringStatus(status) {
     statusDot.className = 'status-dot inactive';
     statusText.textContent = '監測已停止';
     monitorInfo.style.display = 'none';
+    
+    // 顯示當前頁面狀態
+    if (currentTabInfo) {
+      if (isTargetUrl(currentTabInfo.url)) {
+        pageStatus.textContent = '目標頁面 - 可開始監測資料變化';
+        pageStatus.className = 'page-status target';
+      } else if (isStartUrl(currentTabInfo.url)) {
+        pageStatus.textContent = '起始頁面 - 可開始監測頁面跳轉';
+        pageStatus.className = 'page-status start';
+      } else if (isRelevantUrl(currentTabInfo.url)) {
+        pageStatus.textContent = '相關頁面 - 可開始通用監測';
+        pageStatus.className = 'page-status related';
+      } else {
+        pageStatus.textContent = '一般頁面 - 可開始通用監測';
+        pageStatus.className = 'page-status general';
+      }
+    } else {
+      pageStatus.textContent = '準備就緒';
+      pageStatus.className = 'page-status ready';
+    }
     
     toggleBtn.className = 'monitor-btn';
     toggleBtn.disabled = false;
@@ -149,27 +183,32 @@ function toggleMonitoring() {
             chrome.tabs.sendMessage(currentTabId, { action: action }, function(retryResponse) {
               if (chrome.runtime.lastError) {
                 console.error('重試失敗:', formatErrorMessage(chrome.runtime.lastError));
-                toggleBtn.disabled = false;
-                monitorBtnText.textContent = monitoringStatus ? '停止監測' : '開始監測';
+                showError('無法在此頁面啟動監測功能');
+                resetButton();
               } else {
                 handleToggleResponse(retryResponse);
               }
             });
-          }, 500);
+          }, 1000);
         }).catch(err => {
           console.error('腳本注入失敗:', formatErrorMessage(err));
-          toggleBtn.disabled = false;
-          monitorBtnText.textContent = monitoringStatus ? '停止監測' : '開始監測';
+          showError('無法在此頁面載入監測功能');
+          resetButton();
         });
       } else {
-        toggleBtn.disabled = false;
-        monitorBtnText.textContent = monitoringStatus ? '停止監測' : '開始監測';
+        showError('通信錯誤: ' + errorMessage);
+        resetButton();
       }
       return;
     }
     
     handleToggleResponse(response);
   });
+  
+  function resetButton() {
+    toggleBtn.disabled = false;
+    monitorBtnText.textContent = monitoringStatus ? '停止監測' : '開始監測';
+  }
 }
 
 // 處理切換監測的回應
@@ -182,6 +221,7 @@ function handleToggleResponse(response) {
   } else {
     const errorMessage = response ? response.message : '操作失敗';
     console.error('監測操作失敗:', errorMessage);
+    showError('操作失敗: ' + errorMessage);
     
     // 恢復按鈕狀態
     const toggleBtn = document.getElementById('toggleMonitorBtn');
@@ -189,6 +229,32 @@ function handleToggleResponse(response) {
     toggleBtn.disabled = false;
     monitorBtnText.textContent = monitoringStatus ? '停止監測' : '開始監測';
   }
+}
+
+// 顯示錯誤訊息
+function showError(message) {
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'error-message';
+  errorDiv.textContent = message;
+  errorDiv.style.cssText = `
+    background-color: #ffebee;
+    color: #c62828;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 8px 0;
+    font-size: 12px;
+    border-left: 3px solid #c62828;
+  `;
+  
+  const container = document.querySelector('.container');
+  container.insertBefore(errorDiv, container.firstChild);
+  
+  // 3秒後自動移除
+  setTimeout(() => {
+    if (errorDiv.parentNode) {
+      errorDiv.parentNode.removeChild(errorDiv);
+    }
+  }, 3000);
 }
 
 // 手動擷取資料
@@ -227,7 +293,6 @@ function captureAndExtract() {
       console.error('發送消息時發生錯誤:', errorMessage);
       statusMessage.textContent = '通信錯誤: ' + errorMessage;
       
-      // 5秒後隱藏狀態面板
       setTimeout(function() {
         statusPanel.style.display = 'none';
       }, 5000);
@@ -237,7 +302,7 @@ function captureAndExtract() {
     // 處理回應
     if (response && response.success) {
       // 顯示成功訊息
-      statusMessage.textContent = '擷取完成！檔案已儲存到下載資料夾。';
+      statusMessage.textContent = response.message || '擷取完成！檔案已儲存到下載資料夾。';
       
       // 3秒後隱藏狀態面板
       setTimeout(function() {
@@ -248,14 +313,12 @@ function captureAndExtract() {
       let errorMessage = '未知錯誤';
       
       if (response) {
-        // 優先使用message，然後是error，最後是默認值
         errorMessage = response.message || formatErrorMessage(response.error) || '處理失敗';
       }
       
       statusMessage.textContent = '發生錯誤: ' + errorMessage;
       console.error('擷取失敗:', errorMessage);
       
-      // 5秒後隱藏狀態面板
       setTimeout(function() {
         statusPanel.style.display = 'none';
       }, 5000);
@@ -268,20 +331,60 @@ function isTargetUrl(url) {
   return url && url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008');
 }
 
+// 檢查是否為起始網址
+function isStartUrl(url) {
+  return url && (url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/#') || 
+                 (url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/') && !url.includes('IMUE0008')));
+}
+
+// 檢查是否為相關網址
+function isRelevantUrl(url) {
+  return url && url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/');
+}
+
+// 更新頁面資訊顯示
+function updatePageInfo() {
+  const pageInfo = document.getElementById('pageInfo');
+  const urlDisplay = document.getElementById('urlDisplay');
+  
+  if (currentTabInfo) {
+    const url = currentTabInfo.url;
+    const title = currentTabInfo.title;
+    
+    // 顯示簡化的 URL
+    let displayUrl = url;
+    if (url.length > 50) {
+      displayUrl = url.substring(0, 47) + '...';
+    }
+    
+    urlDisplay.textContent = displayUrl;
+    urlDisplay.title = url; // 完整 URL 顯示在 tooltip
+    
+    // 根據頁面類型設置樣式
+    if (isTargetUrl(url)) {
+      pageInfo.className = 'page-info target';
+    } else if (isStartUrl(url)) {
+      pageInfo.className = 'page-info start';
+    } else if (isRelevantUrl(url)) {
+      pageInfo.className = 'page-info related';
+    } else {
+      pageInfo.className = 'page-info general';
+    }
+  }
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
   // 獲取當前標籤頁
   chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
     if (tabs && tabs.length > 0) {
       currentTabId = tabs[0].id;
+      currentTabInfo = tabs[0];
       
-      // 檢查是否為目標網址
-      const isTarget = isTargetUrl(tabs[0].url);
-      if (isTarget) {
-        console.log('當前頁面是目標網址');
-      } else {
-        console.log('當前頁面不是目標網址，但仍可使用監測功能');
-      }
+      console.log('當前標籤頁:', currentTabInfo.url);
+      
+      // 更新頁面資訊顯示
+      updatePageInfo();
       
       // 檢查監測狀態
       checkMonitoringStatus();
@@ -298,22 +401,30 @@ document.addEventListener('DOMContentLoaded', function() {
   const settingsLink = document.getElementById('settingsLink');
   
   // 監測控制按鈕
-  toggleMonitorBtn.addEventListener('click', toggleMonitoring);
+  if (toggleMonitorBtn) {
+    toggleMonitorBtn.addEventListener('click', toggleMonitoring);
+  }
   
   // 手動擷取按鈕
-  captureBtn.addEventListener('click', captureAndExtract);
+  if (captureBtn) {
+    captureBtn.addEventListener('click', captureAndExtract);
+  }
   
   // 說明連結
-  helpLink.addEventListener('click', function(e) {
-    e.preventDefault();
-    chrome.tabs.create({ url: chrome.runtime.getURL('src/options/help.html') });
-  });
+  if (helpLink) {
+    helpLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      chrome.tabs.create({ url: chrome.runtime.getURL('src/options/help.html') });
+    });
+  }
   
   // 設定連結
-  settingsLink.addEventListener('click', function(e) {
-    e.preventDefault();
-    chrome.tabs.create({ url: chrome.runtime.getURL('src/options/options.html') });
-  });
+  if (settingsLink) {
+    settingsLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      chrome.tabs.create({ url: chrome.runtime.getURL('src/options/options.html') });
+    });
+  }
 });
 
 // 清理
