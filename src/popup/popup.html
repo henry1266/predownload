@@ -9,22 +9,29 @@
 <body>
     
     <div class="container">
-        <!-- 監測狀態區域 -->
-        <div class="status-section">
-            <h3>健保雲端監測工具</h3>
-            <div>
-                <div class="status-indicator">
-                    <img src="../../assets/status_icons/status_stopped.png" class="status-icon" id="statusIcon" alt="監測狀態">
-                    <span class="status-text" id="statusText">監測已停止</span>
-                </div>
-            </div>
+        <!-- 標題區域 -->
+        <div class="header">
+            <h2>健保雲端監測工具</h2>
         </div>
 
-        <!-- 控制按鈕區域 -->
-        <div class="controls">
-            <button class="monitor-btn" id="toggleMonitorBtn">
-                <span class="btn-text" id="monitorBtnText">▶️開始監測</span>
-            </button>
+        <!-- 監測狀態區域 -->
+        <div class="status-card">
+            <div class="status-indicator">
+                <img src="../../assets/status_icons/status_stopped.png" class="status-icon" id="statusIcon" alt="監測狀態">
+                <span class="status-text" id="statusText">監測已停止</span>
+            </div>
+            
+            <!-- 控制按鈕區域 -->
+            <div class="controls">
+                <button class="monitor-btn" id="toggleMonitorBtn">
+                    <span class="btn-text" id="monitorBtnText">▶️開始監測</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 資訊區域 -->
+        <div class="info-section">
+            <div class="info-text">點擊按鈕開始或停止監測</div>
         </div>
     </div>
 
