@@ -230,6 +230,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true });
       break;
       
+    case 'updateBrowserIcon':
+      // 處理來自popup的icon更新請求
+      if (message.status === 'monitoring') {
+        // 監測中 - 設置為綠色
+        const imageData = createSuccessIcon();
+        chrome.action.setIcon({ imageData });
+        console.log('設置瀏覽器icon為綠色（監測中）');
+      } else if (message.status === 'stopped') {
+        // 停止監測 - 設置為紅色
+        const imageData = createStoppedIcon();
+        chrome.action.setIcon({ imageData });
+        console.log('設置瀏覽器icon為紅色（監測停止）');
+      }
+      sendResponse({ success: true });
+      break;
+      
     case 'startMonitoring':
       console.log(`標籤頁 ${sender.tab.id} 開始監測`);
       // 開始監測時設置為等待狀態（黃色），jumpSuccess 為 false

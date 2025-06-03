@@ -78,6 +78,12 @@ function updateMonitoringStatus(status) {
     toggleBtn.className = 'monitor-btn stop';
     monitorBtnText.textContent = '⏹️停止監測';
     monitoringStatus = true;
+    
+    // 通知背景腳本更新瀏覽器icon為綠色
+    chrome.runtime.sendMessage({
+      action: 'updateBrowserIcon',
+      status: 'monitoring'
+    });
   } else {
     // 未監測
     statusIcon.src = STATUS_ICONS.STOPPED;
@@ -85,6 +91,12 @@ function updateMonitoringStatus(status) {
     toggleBtn.className = 'monitor-btn';
     monitorBtnText.textContent = '▶️開始監測';
     monitoringStatus = false;
+    
+    // 通知背景腳本更新瀏覽器icon為紅色
+    chrome.runtime.sendMessage({
+      action: 'updateBrowserIcon',
+      status: 'stopped'
+    });
   }
 }
 

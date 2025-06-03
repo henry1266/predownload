@@ -34,4 +34,6 @@
 - [x] 修改 background.js 實作 ICON 狀態切換
 - [x] 確保未開啟 popup 時也能顯示監測狀態
 - [x] 測試 ICON 狀態切換功能
+- [x] 修改 popup.js 中的狀態文字顯示為 "✅監測中" 和 "❌監測停止"
+- [x] 實現 popup 與 background 之間的 icon 狀態同步
 - [ ] 提交更新到 GitHub 倉庫
