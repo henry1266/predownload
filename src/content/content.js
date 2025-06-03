@@ -137,11 +137,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'startMonitoring') {
     console.log('收到開始監測的請求');
     startMonitoring();
-    sendResponse({ success: true, message: '開始監測頁面跳轉' });
+    sendResponse({ success: true, message: '開始監測過卡' });
   } else if (message.action === 'stopMonitoring') {
     console.log('收到停止監測的請求');
     stopMonitoring();
-    sendResponse({ success: true, message: '停止監測頁面跳轉' });
+    sendResponse({ success: true, message: '停止監測' });
   } else if (message.action === 'getMonitorStatus') {
     sendResponse({ 
       isMonitoring: isMonitoring,
@@ -196,7 +196,7 @@ function stopMonitoring() {
     return;
   }
   
-  console.log('停止監測 URL 跳轉...');
+  console.log('停止監測');
   isMonitoring = false;
   
   // 清除監測狀態
@@ -212,9 +212,7 @@ function stopMonitoring() {
   jumpCount = 0;
   successfulJumps = 0;
   retryCount = 0;
-  
-  console.log('URL 跳轉監測已停止');
-  notifyUser('監測已停止', 'info');
+
 }
 
 // 檢查 URL 變化
@@ -230,8 +228,8 @@ function checkUrlChange() {
     
     if (isUrlTargetPage(newUrl)) {
       successfulJumps++;
-      console.log(`🎯 成功跳轉到目標頁面！(第 ${successfulJumps} 次)`);
-      notifyUser(`成功跳轉到目標頁面！(第 ${successfulJumps} 次)`, 'success');
+      console.log(`🎯 成功紀錄`);
+      notifyUser(`成功紀錄！`, 'success');
       
       // 延遲檢查資料，確保頁面完全載入
       setTimeout(() => {

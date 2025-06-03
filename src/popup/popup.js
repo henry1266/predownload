@@ -69,69 +69,21 @@ function updateMonitoringStatus(status) {
   const statusIcon = document.getElementById('statusIcon');
   const statusText = document.getElementById('statusText');
   const toggleBtn = document.getElementById('toggleMonitorBtn');
-  const monitorIcon = document.getElementById('monitorIcon');
   const monitorBtnText = document.getElementById('monitorBtnText');
-  const pageStatus = document.getElementById('pageStatus');
   
   if (status.isMonitoring) {
     // 監測中
     statusIcon.src = STATUS_ICONS.RUNNING;
-    
-    // 根據頁面狀態顯示不同的監測狀態
-    if (status.isOnTargetPage) {
-      statusText.textContent = '正在監測過卡';
-      pageStatus.textContent = '雲端藥歷 - 監測跳轉事件';
-      pageStatus.className = 'page-status target';
-    } else if (status.isOnStartPage) {
-      statusText.textContent = '正在監測 URL 跳轉';
-      pageStatus.textContent = '健保雲端首頁 - 等待過卡';
-      pageStatus.className = 'page-status waiting';
-    } else if (currentTabInfo && currentTabInfo.url.includes('medcloud2.nhi.gov.tw')) {
-      statusText.textContent = '正在監測 URL 跳轉';
-      pageStatus.textContent = '其他健保頁面 - 監測跳轉事件';
-      pageStatus.className = 'page-status related';
-    } else {
-      statusText.textContent = '正在監測 URL 跳轉';
-      pageStatus.textContent = '一般頁面 - 監測跳轉事件';
-      pageStatus.className = 'page-status general';
-    }
-    
+    statusText.textContent = '✅監測中';
     toggleBtn.className = 'monitor-btn stop';
-    toggleBtn.disabled = false;
-    monitorIcon.textContent = '⏹️';
-    monitorBtnText.textContent = '停止監測';
-    
+    monitorBtnText.textContent = '⏹️停止監測';
     monitoringStatus = true;
   } else {
     // 未監測
     statusIcon.src = STATUS_ICONS.STOPPED;
-    statusText.textContent = '監測已停止';
-    
-    // 顯示當前頁面狀態
-    if (currentTabInfo) {
-      if (isTargetUrl(currentTabInfo.url)) {
-        pageStatus.textContent = '雲端藥歷 - 可開始監測跳轉事件';
-        pageStatus.className = 'page-status target';
-      } else if (isStartUrl(currentTabInfo.url)) {
-        pageStatus.textContent = '健保雲端首頁 - 可開始監測跳轉事件';
-        pageStatus.className = 'page-status start';
-      } else if (isRelevantUrl(currentTabInfo.url)) {
-        pageStatus.textContent = '其他健保頁面 - 可開始監測跳轉事件';
-        pageStatus.className = 'page-status related';
-      } else {
-        pageStatus.textContent = '一般頁面 - 無法開始監測跳轉事件';
-        pageStatus.className = 'page-status general';
-      }
-    } else {
-      pageStatus.textContent = '準備就緒';
-      pageStatus.className = 'page-status ready';
-    }
-    
+    statusText.textContent = '❌監測停止';
     toggleBtn.className = 'monitor-btn';
-    toggleBtn.disabled = false;
-    monitorIcon.textContent = '▶️';
-    monitorBtnText.textContent = '開始監測';
-    
+    monitorBtnText.textContent = '▶️開始監測';
     monitoringStatus = false;
   }
 }

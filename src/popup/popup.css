@@ -5,8 +5,8 @@
   --warning-color: #ff9800;
   --error-color: #f44336;
   --info-color: #2196F3;
-  --start-color: #9C27B0;
-  --waiting-color: #FF5722;
+  --start-color: #e23bff;
+  --waiting-color: #fff679;
   --background-color: #f5f5f5;
   --text-color: #333;
   --border-color: #ddd;
@@ -23,7 +23,7 @@ body {
   font-family: "Microsoft JhengHei", "微軟正黑體", Arial, sans-serif;
   font-size: 14px;
   color: var(--text-color);
-  background-color: white;
+
   width: 300px;
   min-height: 200px;
 }
@@ -38,10 +38,14 @@ body {
   padding: 12px;
   background-color: var(--background-color);
   border-radius: 6px;
+  justify-content: center; /* 水平置中 */
+  text-align: center; /* 讓裡面的文字類項目置中 */
+  align-items: center;
 }
 
 .status-header {
   margin-bottom: 8px;
+
 }
 
 .status-indicator {
@@ -57,91 +61,53 @@ body {
 }
 
 .status-text {
-  font-weight: 500;
   color: var(--text-color);
 }
 
-/* 頁面狀態 */
-.page-status {
-  font-size: 12px;
-  padding: 6px 8px;
-  border-radius: 4px;
-  margin-bottom: 8px;
-  text-align: center;
-  font-weight: 500;
-}
-
-.page-status.target {
-  background-color: var(--success-color);
-  color: white;
-}
-
-.page-status.start {
-  background-color: var(--start-color);
-  color: white;
-}
-
-.page-status.waiting {
-  background-color: var(--waiting-color);
-  color: white;
-}
-
-.page-status.related {
-  background-color: var(--info-color);
-  color: white;
-}
-
-.page-status.general {
-  background-color: #999;
-  color: white;
-}
-
-.page-status.ready {
-  background-color: #e0e0e0;
-  color: #666;
-}
 
 /* 控制按鈕區域 */
 .controls {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .monitor-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   padding: 12px 16px;
-  border: none;
   border-radius: 6px;
   font-size: 14px;
-  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: inherit;
-  width: 100%;
+  width: 60%;
+  margin: 0 auto;
 }
 
 .monitor-btn {
-  background-color: var(--success-color);
+  padding: 10px 20px;
+  border: 2px solid #45a049;
+  background-color: transparent; /* 背景透明 */
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
   color: white;
 }
 
 .monitor-btn:hover {
-  background-color: #45a049;
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
+  background-color: var(--success-color);
 }
 
 .monitor-btn.stop {
-  background-color: var(--error-color);
+  padding: 10px 20px;
+  border: 2px solid red;      /* 紅色邊框 */
+  background-color: transparent; /* 背景透明 */
 }
 
 .monitor-btn.stop:hover {
-  background-color: #d32f2f;
+  background-color: var(--error-color);
 }
 
 .monitor-btn:disabled {
