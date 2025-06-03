@@ -1,27 +1,132 @@
-// 頁面監測版本 - 內容腳本 (URL 跳轉監測版)
-// 監測頁面在失敗頁面和成功頁面之間的跳轉，只在成功跳轉到目標頁面時觸發動作
+// 頁面監測版本 - 內容腳本 (URL 跳轉監測版 + 狀態持久化)
+// 監測頁面在失敗頁面和成功頁面之間的跳轉，並在成功跳轉時自動執行資料擷取
 
 // 監測配置
 const MONITOR_CONFIG = {
-  startUrl: 'https://medcloud2.nhi.gov.tw/imu/IMUE1000/#', // 失敗頁面
+  startUrl: 'https://medcloud2.nhi.gov.tw/imu/IMUE1000/#',     // 失敗頁面
   targetUrl: 'https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008', // 成功頁面
-  urlCheckInterval: 500, // URL 檢查間隔 (毫秒)
-  dataCheckDelay: 2000, // 跳轉到目標頁面後延遲檢查資料的時間
-  maxRetries: 3, // 最大重試次數
-  cooldownPeriod: 5000 // 冷卻期間 (5秒)
+  urlCheckInterval: 500,    // URL 檢查間隔 (毫秒)
+  dataCheckDelay: 2000,     // 跳轉後延遲檢查資料的時間
+  maxRetries: 3,            // 最大重試次數
+  cooldownPeriod: 5000,     // 冷卻期間 (5秒)
+  persistenceKey: 'monitoring_state' // 持久化狀態的鍵值
 };
 
 // 全域變數
 let isMonitoring = false;
 let urlCheckInterval = null;
 let currentUrl = window.location.href;
+let jumpCount = 0;
+let successfulJumps = 0;
+let lastDataSnapshot = null;
 let lastProcessedHash = null;
 let lastProcessedTime = 0;
-let monitoringStartTime = null;
-let jumpCount = 0; // 跳轉計數
-let successfulJumps = 0; // 成功跳轉計數
-let lastDataSnapshot = null;
 let retryCount = 0;
+
+// 頁面載入時檢查並恢復監測狀態
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('頁面載入完成，檢查監測狀態...');
+  restoreMonitoringState();
+});
+
+// 如果 DOMContentLoaded 已經觸發，立即執行
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('頁面載入完成，檢查監測狀態...');
+    restoreMonitoringState();
+  });
+} else {
+  console.log('頁面已載入，立即檢查監測狀態...');
+  restoreMonitoringState();
+}
+
+// 恢復監測狀態
+async function restoreMonitoringState() {
+  try {
+    console.log('嘗試恢復監測狀態...');
+    
+    // 從 chrome.storage 獲取監測狀態
+    const result = await chrome.storage.local.get([MONITOR_CONFIG.persistenceKey]);
+    const savedState = result[MONITOR_CONFIG.persistenceKey];
+    
+    if (savedState && savedState.isMonitoring) {
+      console.log('發現已儲存的監測狀態，正在恢復...');
+      console.log('儲存的狀態:', savedState);
+      
+      // 檢查狀態是否過期（超過 1 小時自動失效）
+      const now = Date.now();
+      const stateAge = now - (savedState.timestamp || 0);
+      const maxAge = 60 * 60 * 1000; // 1 小時
+      
+      if (stateAge > maxAge) {
+        console.log('監測狀態已過期，清除狀態');
+        await clearMonitoringState();
+        return;
+      }
+      
+      // 恢復監測狀態
+      jumpCount = savedState.jumpCount || 0;
+      successfulJumps = savedState.successfulJumps || 0;
+      lastDataSnapshot = savedState.lastDataSnapshot || null;
+      lastProcessedHash = savedState.lastProcessedHash || null;
+      lastProcessedTime = savedState.lastProcessedTime || 0;
+      
+      // 重新開始監測
+      console.log('重新開始監測...');
+      startMonitoring();
+      
+      // 顯示恢復通知
+      notifyUser('監測狀態已恢復！繼續監測頁面跳轉', 'success');
+      
+      // 如果當前在目標頁面，立即檢查一次資料
+      if (isOnTargetPage()) {
+        console.log('當前在目標頁面，立即檢查資料...');
+        setTimeout(() => {
+          checkDataAfterSuccessfulJump();
+        }, 1000);
+      }
+      
+    } else {
+      console.log('沒有找到監測狀態，或監測已停止');
+    }
+  } catch (error) {
+    console.error('恢復監測狀態時發生錯誤:', error);
+  }
+}
+
+// 儲存監測狀態
+async function saveMonitoringState() {
+  try {
+    const state = {
+      isMonitoring: isMonitoring,
+      jumpCount: jumpCount,
+      successfulJumps: successfulJumps,
+      lastDataSnapshot: lastDataSnapshot,
+      lastProcessedHash: lastProcessedHash,
+      lastProcessedTime: lastProcessedTime,
+      timestamp: Date.now(),
+      url: window.location.href
+    };
+    
+    await chrome.storage.local.set({
+      [MONITOR_CONFIG.persistenceKey]: state
+    });
+    
+    console.log('監測狀態已儲存:', state);
+  } catch (error) {
+    console.error('儲存監測狀態時發生錯誤:', error);
+  }
+}
+
+// 清除監測狀態
+async function clearMonitoringState() {
+  try {
+    await chrome.storage.local.remove([MONITOR_CONFIG.persistenceKey]);
+    console.log('監測狀態已清除');
+  } catch (error) {
+    console.error('清除監測狀態時發生錯誤:', error);
+  }
+}
 
 // 監聽來自背景腳本的消息
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -31,11 +136,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // 非同步回應
   } else if (message.action === 'startMonitoring') {
     console.log('收到開始監測的請求');
-    startUrlJumpMonitoring();
+    startMonitoring();
     sendResponse({ success: true, message: '開始監測頁面跳轉' });
   } else if (message.action === 'stopMonitoring') {
     console.log('收到停止監測的請求');
-    stopUrlJumpMonitoring();
+    stopMonitoring();
     sendResponse({ success: true, message: '停止監測頁面跳轉' });
   } else if (message.action === 'getMonitorStatus') {
     sendResponse({ 
@@ -44,13 +149,108 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       isOnTargetPage: isOnTargetPage(),
       isOnStartPage: isOnStartPage(),
       lastProcessed: lastProcessedTime ? new Date(lastProcessedTime).toISOString() : null,
-      startTime: monitoringStartTime,
       jumpCount: jumpCount,
       successfulJumps: successfulJumps
     });
+  } else if (message.action === 'ping') {
+    sendResponse({ success: true, message: 'pong' });
   }
   return true;
 });
+
+// 開始監測
+function startMonitoring() {
+  if (isMonitoring) {
+    console.log('監測已在進行中');
+    return;
+  }
+  
+  console.log('開始監測 URL 跳轉...');
+  isMonitoring = true;
+  currentUrl = window.location.href;
+  
+  // 儲存監測狀態
+  saveMonitoringState();
+  
+  // 如果當前在目標頁面，立即檢查一次資料
+  if (isOnTargetPage()) {
+    console.log('當前在目標頁面，立即檢查資料...');
+    setTimeout(() => {
+      checkDataAfterSuccessfulJump();
+    }, MONITOR_CONFIG.dataCheckDelay);
+  }
+  
+  // 開始 URL 監測循環
+  urlCheckInterval = setInterval(() => {
+    checkUrlChange();
+  }, MONITOR_CONFIG.urlCheckInterval);
+  
+  console.log('URL 跳轉監測已啟動');
+  notifyUser('開始監測頁面跳轉', 'success');
+}
+
+// 停止監測
+function stopMonitoring() {
+  if (!isMonitoring) {
+    console.log('監測未在進行中');
+    return;
+  }
+  
+  console.log('停止監測 URL 跳轉...');
+  isMonitoring = false;
+  
+  // 清除監測狀態
+  clearMonitoringState();
+  
+  // 停止 URL 檢查
+  if (urlCheckInterval) {
+    clearInterval(urlCheckInterval);
+    urlCheckInterval = null;
+  }
+  
+  // 重置統計
+  jumpCount = 0;
+  successfulJumps = 0;
+  retryCount = 0;
+  
+  console.log('URL 跳轉監測已停止');
+  notifyUser('監測已停止', 'info');
+}
+
+// 檢查 URL 變化
+function checkUrlChange() {
+  const newUrl = window.location.href;
+  
+  if (newUrl !== currentUrl) {
+    jumpCount++;
+    console.log(`檢測到 URL 跳轉 (第 ${jumpCount} 次):`, currentUrl, '->', newUrl);
+    
+    // 儲存更新的狀態
+    saveMonitoringState();
+    
+    if (isUrlTargetPage(newUrl)) {
+      successfulJumps++;
+      console.log(`🎯 成功跳轉到目標頁面！(第 ${successfulJumps} 次)`);
+      notifyUser(`成功跳轉到目標頁面！(第 ${successfulJumps} 次)`, 'success');
+      
+      // 延遲檢查資料，確保頁面完全載入
+      setTimeout(() => {
+        if (isMonitoring && isOnTargetPage()) {
+          checkDataAfterSuccessfulJump();
+        }
+      }, MONITOR_CONFIG.dataCheckDelay);
+      
+    } else if (isUrlStartPage(newUrl)) {
+      console.log('↩️ 跳轉回起始頁面，繼續等待下次成功跳轉');
+      notifyUser('跳轉回起始頁面，繼續等待下次成功跳轉', 'info');
+    } else {
+      console.log('🔄 頁面跳轉中...');
+      notifyUser('頁面跳轉中...', 'info');
+    }
+    
+    currentUrl = newUrl;
+  }
+}
 
 // 檢查是否在目標頁面
 function isOnTargetPage() {
@@ -68,127 +268,6 @@ function isOnStartPage() {
 function isRelevantPage() {
   const url = window.location.href;
   return url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/');
-}
-
-// 開始 URL 跳轉監測
-function startUrlJumpMonitoring() {
-  if (isMonitoring) {
-    console.log('監測已在運行中');
-    return;
-  }
-  
-  console.log('開始監測 URL 跳轉...');
-  isMonitoring = true;
-  retryCount = 0;
-  jumpCount = 0;
-  successfulJumps = 0;
-  monitoringStartTime = new Date().toISOString();
-  currentUrl = window.location.href;
-  
-  // 顯示當前狀態
-  console.log('當前 URL:', currentUrl);
-  if (isOnTargetPage()) {
-    console.log('當前在目標頁面，開始監測跳轉');
-    notifyUser('開始監測頁面跳轉 - 當前在目標頁面', 'info');
-    
-    // 如果已經在目標頁面，先檢查一次資料
-    setTimeout(() => {
-      if (isMonitoring) {
-        checkDataAfterSuccessfulJump();
-      }
-    }, MONITOR_CONFIG.dataCheckDelay);
-    
-  } else if (isOnStartPage()) {
-    console.log('當前在起始頁面，等待跳轉到目標頁面');
-    notifyUser('開始監測頁面跳轉 - 等待跳轉到目標頁面', 'info');
-  } else if (isRelevantPage()) {
-    console.log('當前在相關頁面，啟用通用跳轉監測');
-    notifyUser('啟用頁面跳轉監測', 'info');
-  } else {
-    console.log('當前頁面不是目標系統，啟用通用監測');
-    notifyUser('啟用通用頁面跳轉監測', 'info');
-  }
-  
-  // 開始 URL 監測循環
-  startUrlCheckLoop();
-  
-  console.log('URL 跳轉監測已啟動');
-}
-
-// 停止 URL 跳轉監測
-function stopUrlJumpMonitoring() {
-  if (!isMonitoring) {
-    return;
-  }
-  
-  console.log('停止 URL 跳轉監測...');
-  isMonitoring = false;
-  
-  // 清理 URL 檢查循環
-  if (urlCheckInterval) {
-    clearInterval(urlCheckInterval);
-    urlCheckInterval = null;
-  }
-  
-  console.log(`監測已停止。總跳轉次數: ${jumpCount}, 成功跳轉次數: ${successfulJumps}`);
-  notifyUser(`監測已停止 - 總跳轉 ${jumpCount} 次，成功 ${successfulJumps} 次`, 'info');
-}
-
-// 開始 URL 檢查循環
-function startUrlCheckLoop() {
-  if (urlCheckInterval) {
-    clearInterval(urlCheckInterval);
-  }
-  
-  urlCheckInterval = setInterval(() => {
-    if (!isMonitoring) {
-      clearInterval(urlCheckInterval);
-      return;
-    }
-    
-    checkUrlChange();
-  }, MONITOR_CONFIG.urlCheckInterval);
-  
-  console.log('URL 檢查循環已啟動，檢查間隔:', MONITOR_CONFIG.urlCheckInterval, 'ms');
-}
-
-// 檢查 URL 變化
-function checkUrlChange() {
-  const newUrl = window.location.href;
-  
-  if (newUrl !== currentUrl) {
-    console.log('檢測到 URL 變化:');
-    console.log('舊 URL:', currentUrl);
-    console.log('新 URL:', newUrl);
-    
-    jumpCount++;
-    
-    // 檢查是否跳轉到目標頁面
-    if (isUrlTargetPage(newUrl)) {
-      console.log('🎯 成功跳轉到目標頁面！');
-      successfulJumps++;
-      
-      notifyUser(`成功跳轉到目標頁面！(第 ${successfulJumps} 次)`, 'success');
-      
-      // 延遲檢查資料，確保頁面完全載入
-      setTimeout(() => {
-        if (isMonitoring && isOnTargetPage()) {
-          checkDataAfterSuccessfulJump();
-        }
-      }, MONITOR_CONFIG.dataCheckDelay);
-      
-    } else if (isUrlStartPage(newUrl)) {
-      console.log('↩️ 跳轉回起始頁面，繼續監測...');
-      notifyUser('跳轉回起始頁面，繼續等待下次成功跳轉', 'warning');
-      
-    } else {
-      console.log('🔄 跳轉到其他頁面:', newUrl);
-      notifyUser('頁面跳轉中...', 'info');
-    }
-    
-    // 更新當前 URL
-    currentUrl = newUrl;
-  }
 }
 
 // 檢查 URL 是否為目標頁面
@@ -278,6 +357,9 @@ function checkDataAfterSuccessfulJump() {
       lastProcessedHash = currentHash;
       lastProcessedTime = now;
       
+      // 儲存更新的狀態
+      saveMonitoringState();
+      
       retryCount = 0; // 重置重試計數
     } else {
       console.log('跳轉後資料無變化');
@@ -314,9 +396,11 @@ function updateDataSnapshot(tableData, personalInfo) {
   lastDataSnapshot = {
     tableData: tableData,
     personalInfo: personalInfo,
+    hash: generateDataHash(tableData, personalInfo),
     timestamp: new Date().toISOString(),
-    hash: generateDataHash(tableData, personalInfo)
+    url: window.location.href
   };
+  console.log('資料快照已更新:', lastDataSnapshot);
 }
 
 // 生成資料雜湊值
@@ -329,12 +413,12 @@ function generateDataHash(tableData, personalInfo) {
     jumpCount: jumpCount // 加入跳轉計數作為雜湊因子
   });
   
-  // 簡單的雜湊函數
+  // 生成雜湊值
   let hash = 0;
   for (let i = 0; i < dataString.length; i++) {
     const char = dataString.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // 轉換為 32 位整數
+    hash = hash & hash;
   }
   return hash.toString();
 }
@@ -417,647 +501,224 @@ function triggerAutoActionAfterJump(tableData, personalInfo) {
 // 處理資料擷取
 function handleDataExtraction(sendResponse) {
   try {
-    // 檢查是否在冷卻期間
-    const now = Date.now();
-    if (lastProcessedTime && (now - lastProcessedTime) < MONITOR_CONFIG.cooldownPeriod) {
-      const remainingTime = Math.ceil((MONITOR_CONFIG.cooldownPeriod - (now - lastProcessedTime)) / 1000);
-      console.log(`在冷卻期間，還需等待 ${remainingTime} 秒`);
-      sendResponse({
-        success: false,
-        message: `冷卻期間，請等待 ${remainingTime} 秒後再試`,
-        timestamp: new Date().toISOString()
-      });
-      return;
-    }
-
-    // 根據頁面類型選擇適當的擷取方法
-    let tableData;
-    if (detectMedicalSystem()) {
-      console.log('使用醫療系統專用擷取邏輯');
-      tableData = extractMedicalTableData();
-    } else {
-      console.log('使用通用表格擷取邏輯');
-      tableData = extractTableData();
-    }
+    console.log('開始處理資料擷取請求...');
     
-    // 擷取個人基本資料
-    console.log('開始擷取個人基本資料');
+    const tableData = extractTableData();
     const personalInfo = getPersonalInfo();
     
-    // 檢查是否有實際資料
     if (!tableData || tableData.length === 0) {
-      console.log('未找到表格資料');
+      console.warn('未找到表格資料');
       sendResponse({
         success: false,
-        message: '未找到表格資料',
-        timestamp: new Date().toISOString()
+        message: '未找到表格資料，請確認頁面已完全載入'
       });
       return;
     }
-
-    // 生成資料雜湊值檢查是否重複
-    const currentHash = generateDataHash(tableData, personalInfo);
-    if (lastProcessedHash === currentHash) {
-      console.log('資料未變化，跳過處理');
-      sendResponse({
-        success: false,
-        message: '資料未變化，跳過重複處理',
-        timestamp: new Date().toISOString()
-      });
-      return;
-    }
-
-    console.log('擷取結果:', `成功擷取 ${tableData.length} 筆表格資料`);
-    console.log('個人資料擷取結果:', personalInfo ? '成功擷取個人資料' : '未找到個人資料');
     
-    // 更新資料快照和處理記錄
-    updateDataSnapshot(tableData, personalInfo);
-    lastProcessedHash = currentHash;
-    lastProcessedTime = now;
+    console.log(`成功擷取 ${tableData.length} 筆表格資料`);
     
-    sendResponse({ 
+    sendResponse({
       success: true,
       tableData: tableData,
       personalInfo: personalInfo,
-      message: `成功擷取 ${tableData.length} 筆資料`,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      message: `成功擷取 ${tableData.length} 筆資料`
     });
+    
   } catch (error) {
-    console.error('資料擷取時發生錯誤:', error);
+    console.error('處理資料擷取時發生錯誤:', error);
     sendResponse({
       success: false,
-      message: '資料擷取失敗: ' + error.message,
-      timestamp: new Date().toISOString()
+      message: '擷取資料時發生錯誤: ' + error.message
     });
+  }
+}
+
+// 擷取表格資料
+function extractTableData() {
+  try {
+    console.log('開始擷取表格資料...');
+    
+    // 尋找表格
+    const tables = document.querySelectorAll('table');
+    console.log(`找到 ${tables.length} 個表格`);
+    
+    if (tables.length === 0) {
+      console.log('頁面中沒有找到表格');
+      return [];
+    }
+    
+    let allData = [];
+    
+    tables.forEach((table, tableIndex) => {
+      console.log(`處理第 ${tableIndex + 1} 個表格...`);
+      
+      const rows = table.querySelectorAll('tr');
+      if (rows.length === 0) {
+        console.log(`表格 ${tableIndex + 1} 沒有資料行`);
+        return;
+      }
+      
+      // 獲取表頭
+      let headers = [];
+      const headerRow = rows[0];
+      const headerCells = headerRow.querySelectorAll('th, td');
+      headerCells.forEach(cell => {
+        headers.push(cell.textContent.trim());
+      });
+      
+      console.log(`表格 ${tableIndex + 1} 表頭:`, headers);
+      
+      // 處理資料行
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const cells = row.querySelectorAll('td, th');
+        
+        if (cells.length === 0) continue;
+        
+        const rowData = {};
+        cells.forEach((cell, cellIndex) => {
+          const header = headers[cellIndex] || `欄位${cellIndex + 1}`;
+          rowData[header] = cell.textContent.trim();
+        });
+        
+        // 只添加非空的資料行
+        if (Object.values(rowData).some(value => value !== '')) {
+          rowData['_表格編號'] = tableIndex + 1;
+          rowData['_資料行編號'] = i;
+          allData.push(rowData);
+        }
+      }
+    });
+    
+    console.log(`總共擷取到 ${allData.length} 筆資料`);
+    return allData;
+    
+  } catch (error) {
+    console.error('擷取表格資料時發生錯誤:', error);
+    return [];
+  }
+}
+
+// 獲取個人資料
+function getPersonalInfo() {
+  try {
+    console.log('開始擷取個人資料...');
+    
+    const personalInfo = {
+      extractedAt: new Date().toISOString(),
+      source: window.location.href
+    };
+    
+    // 尋找常見的個人資料欄位
+    const commonFields = [
+      { key: 'idNumber', selectors: ['input[name*="id"]', 'input[name*="身分證"]', '[class*="id"]'] },
+      { key: 'name', selectors: ['input[name*="name"]', 'input[name*="姓名"]', '[class*="name"]'] },
+      { key: 'birthDate', selectors: ['input[name*="birth"]', 'input[name*="生日"]', '[class*="birth"]'] },
+      { key: 'gender', selectors: ['input[name*="gender"]', 'input[name*="性別"]', '[class*="gender"]'] }
+    ];
+    
+    commonFields.forEach(field => {
+      for (const selector of field.selectors) {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          const value = element.value || element.textContent;
+          if (value && value.trim() !== '') {
+            personalInfo[field.key] = value.trim();
+            console.log(`找到 ${field.key}:`, value.trim());
+          }
+        });
+        if (personalInfo[field.key]) break;
+      }
+    });
+    
+    // 尋找顯示的文字資訊
+    const textElements = document.querySelectorAll('span, div, p, td');
+    textElements.forEach(element => {
+      const text = element.textContent.trim();
+      
+      // 身分證號碼模式
+      if (/^[A-Z]\d{9}$/.test(text)) {
+        personalInfo.idNumber = text;
+      }
+      
+      // 日期模式
+      if (/^\d{2,4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}$/.test(text)) {
+        if (!personalInfo.birthDate) {
+          personalInfo.birthDate = text;
+        }
+      }
+    });
+    
+    console.log('個人資料擷取完成:', personalInfo);
+    return personalInfo;
+    
+  } catch (error) {
+    console.error('擷取個人資料時發生錯誤:', error);
+    return {
+      extractedAt: new Date().toISOString(),
+      source: window.location.href,
+      error: error.message
+    };
   }
 }
 
 // 顯示通知
 function notifyUser(message, type = 'info') {
-  console.log(`[${type.toUpperCase()}] ${message}`);
-  
-  // 創建頁面通知
-  const notification = document.createElement('div');
-  notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 12px 20px;
-    border-radius: 4px;
-    color: white;
-    font-weight: bold;
-    z-index: 10000;
-    max-width: 350px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    font-size: 14px;
-    line-height: 1.4;
-  `;
-  
-  // 根據類型設置顏色
-  switch (type) {
-    case 'success':
-      notification.style.backgroundColor = '#4CAF50';
-      break;
-    case 'error':
-      notification.style.backgroundColor = '#f44336';
-      break;
-    case 'warning':
-      notification.style.backgroundColor = '#ff9800';
-      break;
-    default:
-      notification.style.backgroundColor = '#2196F3';
-  }
-  
-  notification.textContent = message;
-  document.body.appendChild(notification);
-  
-  // 根據類型設置不同的顯示時間
-  const displayTime = type === 'success' ? 5000 : 3000;
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.parentNode.removeChild(notification);
-    }
-  }, displayTime);
-}
-
-// 初始化
-function initialize() {
-  console.log('醫療資料頁面監測工具已啟動 (URL 跳轉監測版)');
-  
-  // 記錄初始 URL
-  currentUrl = window.location.href;
-  console.log('初始 URL:', currentUrl);
-  
-  // 在頁面載入完成後執行初始化
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', afterLoaded);
-  } else {
-    afterLoaded();
-  }
-  
-  function afterLoaded() {
-    // 檢測頁面是否為醫療資訊系統
-    const isMedicalSystem = detectMedicalSystem();
-    if (isMedicalSystem) {
-      console.log('檢測到醫療資訊系統');
-    }
-    
-    // 如果是相關頁面，顯示可以開始監測的提示
-    if (isRelevantPage()) {
-      console.log('檢測到相關頁面，可開始 URL 跳轉監測');
-      if (isOnTargetPage()) {
-        console.log('當前在目標頁面');
-      } else if (isOnStartPage()) {
-        console.log('當前在起始頁面');
-      }
-    }
-  }
-}
-
-// 執行初始化
-initialize();
-
-// 以下是原有的資料擷取功能 (保持不變)
-// ... (包含所有原有的擷取函數)
-
-// 擷取表格資料的主要功能
-function extractTableData() {
   try {
-    console.log('開始擷取表格資料...');
+    // 創建通知元素
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 6px;
+      color: white;
+      font-weight: bold;
+      z-index: 10000;
+      max-width: 300px;
+      word-wrap: break-word;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+    `;
     
-    // 優先嘗試擷取 DataTables 結構
-    let result = extractDataTablesData();
-    if (result && result.length > 0) {
-      console.log('成功擷取 DataTables 資料，共', result.length, '筆記錄');
-      return result;
-    }
-    
-    // 如果 DataTables 擷取失敗，回退到通用表格擷取
-    console.log('DataTables 擷取失敗，嘗試通用表格擷取...');
-    result = extractGenericTableData();
-    if (result && result.length > 0) {
-      console.log('成功擷取通用表格資料，共', result.length, '筆記錄');
-      return result;
-    }
-    
-    console.warn('未能擷取到任何表格資料');
-    return null;
-  } catch (error) {
-    console.error('擷取表格資料時發生錯誤:', error);
-    return null;
-  }
-}
-
-// 擷取 DataTables 結構的資料
-function extractDataTablesData() {
-  try {
-    // 尋找 DataTables 容器
-    const dataTablesWrapper = document.querySelector('.dataTables_wrapper');
-    if (!dataTablesWrapper) {
-      console.log('未找到 DataTables 結構');
-      return null;
-    }
-    
-    console.log('找到 DataTables 結構，開始擷取...');
-    
-    // 獲取表頭 - 從 dataTables_scrollHead 區域
-    const headers = [];
-    const scrollHead = dataTablesWrapper.querySelector('.dataTables_scrollHead');
-    if (scrollHead) {
-      const headerCells = scrollHead.querySelectorAll('th');
-      headerCells.forEach(cell => {
-        // 清理表頭文字，移除排序相關的屬性文字
-        let headerText = cell.textContent.trim();
-        // 移除 "activate to sort column ascending" 等文字
-        headerText = headerText.replace(/:\s*activate to sort.*$/i, '');
-        headers.push(headerText);
-      });
-      console.log('擷取到表頭:', headers);
-    }
-    
-    // 如果沒有找到 scrollHead，嘗試從主表格獲取表頭
-    if (headers.length === 0) {
-      const mainTable = dataTablesWrapper.querySelector('table');
-      if (mainTable) {
-        const headerCells = mainTable.querySelectorAll('thead th');
-        headerCells.forEach(cell => {
-          let headerText = cell.textContent.trim();
-          headerText = headerText.replace(/:\s*activate to sort.*$/i, '');
-          headers.push(headerText);
-        });
-        console.log('從主表格擷取到表頭:', headers);
-      }
-    }
-    
-    // 獲取資料 - 從 dataTables_scrollBody 區域或主表格的 tbody
-    const data = [];
-    let dataRows = [];
-    
-    // 優先從 scrollBody 獲取資料
-    const scrollBody = dataTablesWrapper.querySelector('.dataTables_scrollBody');
-    if (scrollBody) {
-      const tbody = scrollBody.querySelector('tbody');
-      if (tbody) {
-        dataRows = tbody.querySelectorAll('tr');
-        console.log('從 scrollBody 找到', dataRows.length, '行資料');
-      }
-    }
-    
-    // 如果沒有找到 scrollBody，從主表格獲取
-    if (dataRows.length === 0) {
-      const mainTable = dataTablesWrapper.querySelector('table tbody');
-      if (mainTable) {
-        dataRows = mainTable.querySelectorAll('tr');
-        console.log('從主表格找到', dataRows.length, '行資料');
-      }
-    }
-    
-    // 處理每一行資料
-    dataRows.forEach((row, rowIndex) => {
-      const cells = row.querySelectorAll('td');
-      if (cells.length === 0) return;
-      
-      const rowData = {};
-      cells.forEach((cell, cellIndex) => {
-        // 使用表頭作為鍵名，如果表頭不存在則使用索引
-        const key = headers[cellIndex] || `column${cellIndex}`;
-        
-        // 處理包含 <br> 標籤的多行內容
-        let cellContent = '';
-        if (cell.innerHTML.includes('<br>')) {
-          // 將 <br> 替換為換行符，保持多行結構
-          cellContent = cell.innerHTML
-            .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<[^>]*>/g, '') // 移除其他HTML標籤
-            .trim();
-        } else {
-          cellContent = cell.textContent.trim();
-        }
-        
-        rowData[key] = cellContent;
-      });
-      
-      data.push(rowData);
-    });
-    
-    return data;
-  } catch (error) {
-    console.error('擷取 DataTables 資料時發生錯誤:', error);
-    return null;
-  }
-}
-
-// 通用表格資料擷取（原有邏輯的改進版）
-function extractGenericTableData() {
-  try {
-    // 尋找頁面中的所有表格
-    const tables = document.querySelectorAll('table');
-    if (!tables || tables.length === 0) {
-      console.warn('頁面中未找到表格');
-      return null;
-    }
-    
-    // 尋找最可能包含資料的表格（排除明顯的裝飾性表格）
-    let targetTable = null;
-    for (let table of tables) {
-      const rows = table.querySelectorAll('tr');
-      const dataCells = table.querySelectorAll('td');
-      
-      // 如果表格有足夠的行和資料儲存格，認為是資料表格
-      if (rows.length > 1 && dataCells.length > 0) {
-        targetTable = table;
+    // 根據類型設置顏色
+    switch (type) {
+      case 'success':
+        notification.style.backgroundColor = '#4CAF50';
         break;
+      case 'error':
+        notification.style.backgroundColor = '#f44336';
+        break;
+      case 'warning':
+        notification.style.backgroundColor = '#ff9800';
+        break;
+      default:
+        notification.style.backgroundColor = '#2196F3';
+    }
+    
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    // 3 秒後自動移除
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 300);
       }
-    }
+    }, 3000);
     
-    if (!targetTable) {
-      console.warn('未找到合適的資料表格');
-      return null;
-    }
-    
-    console.log('使用通用方法處理表格，表格有', targetTable.querySelectorAll('tr').length, '行');
-    
-    // 獲取表頭
-    const headers = [];
-    const headerRow = targetTable.querySelector('tr');
-    if (headerRow) {
-      const headerCells = headerRow.querySelectorAll('th');
-      if (headerCells && headerCells.length > 0) {
-        headerCells.forEach(cell => {
-          headers.push(cell.textContent.trim());
-        });
-      } else {
-        // 如果沒有 th 元素，嘗試使用第一行的 td 元素作為表頭
-        const firstRowCells = headerRow.querySelectorAll('td');
-        firstRowCells.forEach(cell => {
-          headers.push(cell.textContent.trim());
-        });
-      }
-    }
-    
-    // 獲取表格資料
-    const rows = targetTable.querySelectorAll('tr');
-    const data = [];
-    
-    // 從第二行開始處理資料行（跳過表頭）
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      const cells = row.querySelectorAll('td');
-      if (cells.length === 0) continue;
-      
-      const rowData = {};
-      cells.forEach((cell, index) => {
-        // 使用表頭作為鍵名，如果表頭不存在則使用索引
-        const key = headers[index] || `column${index}`;
-        
-        // 處理包含 <br> 標籤的多行內容
-        let cellContent = '';
-        if (cell.innerHTML.includes('<br>')) {
-          cellContent = cell.innerHTML
-            .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<[^>]*>/g, '')
-            .trim();
-        } else {
-          cellContent = cell.textContent.trim();
-        }
-        
-        rowData[key] = cellContent;
-      });
-      
-      data.push(rowData);
-    }
-    
-    return data;
+    console.log(`通知 (${type}):`, message);
   } catch (error) {
-    console.error('通用表格擷取時發生錯誤:', error);
-    return null;
+    console.error('顯示通知時發生錯誤:', error);
+    console.log(`通知 (${type}):`, message);
   }
 }
 
-// 針對醫療資訊系統的特殊處理
-function extractMedicalTableData() {
-  try {
-    console.log('使用醫療系統專用擷取邏輯...');
-    
-    // 針對健保醫療資訊雲端查詢系統的特殊處理
-    if (detectNHIMediCloudSystem()) {
-      console.log('檢測到健保醫療資訊雲端查詢系統');
-      return extractNHIMediCloudData();
-    }
-    
-    // 其他醫療系統可以在這裡添加特殊處理
-    
-    // 如果沒有特殊處理，使用通用邏輯
-    return extractTableData();
-  } catch (error) {
-    console.error('醫療系統資料擷取時發生錯誤:', error);
-    return extractTableData(); // 回退到通用邏輯
-  }
-}
-
-// 檢測是否為健保醫療資訊雲端查詢系統
-function detectNHIMediCloudSystem() {
-  const pageTitle = document.title;
-  const url = window.location.href;
-  
-  // 檢查頁面標題
-  if (pageTitle.includes('健保醫療資訊雲端查詢系統') || pageTitle.includes('NHI MediCloud System')) {
-    return true;
-  }
-  
-  // 檢查 URL
-  if (url.includes('medcloud2.nhi.gov.tw')) {
-    return true;
-  }
-  
-  // 檢查頁面內容
-  const logoElement = document.querySelector('.logo a');
-  if (logoElement && logoElement.textContent.includes('健保醫療資訊雲端查詢系統')) {
-    return true;
-  }
-  
-  // 檢查是否有特定的功能標籤
-  const functionTabs = document.querySelectorAll('.function-tab a');
-  const tabTexts = Array.from(functionTabs).map(tab => tab.textContent);
-  const medicalTabs = ['西醫用藥', '中醫醫療', '牙科處置紀錄', '過敏紀錄', '檢查與檢驗'];
-  
-  return medicalTabs.some(tab => tabTexts.some(text => text.includes(tab)));
-}
-
-// 專門處理健保醫療資訊雲端查詢系統的資料擷取
-function extractNHIMediCloudData() {
-  try {
-    // 首先嘗試 DataTables 結構
-    let result = extractDataTablesData();
-    if (result && result.length > 0) {
-      // 對健保系統的資料進行後處理
-      return postProcessNHIData(result);
-    }
-    
-    // 如果 DataTables 失敗，嘗試其他方法
-    return extractGenericTableData();
-  } catch (error) {
-    console.error('健保系統資料擷取失敗:', error);
-    return null;
-  }
-}
-
-// 對健保系統資料進行後處理
-function postProcessNHIData(data) {
-  if (!data || !Array.isArray(data)) return data;
-  
-  return data.map(row => {
-    const processedRow = { ...row };
-    
-    // 處理日期格式（民國年轉西元年）
-    Object.keys(processedRow).forEach(key => {
-      if (key.includes('日期') && processedRow[key]) {
-        processedRow[key] = convertROCDateToAD(processedRow[key]);
-      }
-    });
-    
-    // 處理來源欄位的多行資料
-    if (processedRow['來源']) {
-      const sourceLines = processedRow['來源'].split('\n');
-      if (sourceLines.length >= 3) {
-        processedRow['醫院名稱'] = sourceLines[0];
-        processedRow['門診類型'] = sourceLines[1];
-        processedRow['機構代碼'] = sourceLines[2];
-      }
-    }
-    
-    return processedRow;
-  });
-}
-
-// 轉換民國年日期為西元年
-function convertROCDateToAD(rocDate) {
-  if (!rocDate || typeof rocDate !== 'string') return rocDate;
-  
-  // 匹配民國年格式：114/05/31
-  const rocPattern = /^(\d{2,3})\/(\d{1,2})\/(\d{1,2})$/;
-  const match = rocDate.match(rocPattern);
-  
-  if (match) {
-    const rocYear = parseInt(match[1]);
-    const month = match[2].padStart(2, '0');
-    const day = match[3].padStart(2, '0');
-    const adYear = rocYear + 1911;
-    
-    return `${adYear}/${month}/${day}`;
-  }
-  
-  return rocDate; // 如果不符合格式，返回原始值
-}
-
-// 檢測頁面是否為醫療資訊系統
-function detectMedicalSystem() {
-  // 簡單檢測頁面標題或URL是否包含醫療相關關鍵字
-  const pageTitle = document.title.toLowerCase();
-  const url = window.location.href.toLowerCase();
-  
-  const medicalKeywords = [
-    '醫療', '健保', 'medicloud', '病歷', '藥品', '診所', '醫院', '門診'
-  ];
-  
-  return medicalKeywords.some(keyword => 
-    pageTitle.includes(keyword) || url.includes(keyword)
-  );
-}
-
-// 擷取個人基本資料
-function extractPersonalInfo() {
-  try {
-    console.log('開始擷取個人基本資料...');
-    
-    const personalInfo = {};
-    
-    // 擷取身分證號
-    const idElement = document.querySelector('.idno');
-    if (idElement) {
-      const idText = idElement.textContent.trim();
-      // 移除前綴文字，提取實際身分證號
-      const idMatch = idText.match(/[A-Z]\d{2}\*{3}\d{3}|[A-Z]\d{9}/);
-      if (idMatch) {
-        personalInfo.idNumber = idMatch[0];
-        console.log('找到身分證號:', personalInfo.idNumber);
-      } else {
-        // 如果沒有匹配到標準格式，保留原始文字（去除前綴）
-        personalInfo.idNumber = idText.replace(/^身分證號[：:]\s*/, '');
-      }
-    }
-    
-    // 擷取姓名
-    const nameElement = document.querySelector('.name');
-    if (nameElement) {
-      personalInfo.name = nameElement.textContent.trim();
-      console.log('找到姓名:', personalInfo.name);
-    }
-    
-    // 擷取出生日期
-    const birthElement = document.querySelector('.birth');
-    if (birthElement) {
-      const birthText = birthElement.textContent.trim();
-      personalInfo.birthDate = birthText;
-      
-      // 嘗試轉換民國年為西元年
-      const rocMatch = birthText.match(/民\s*(\d{2,3})\/(\d{1,2})\/(\d{1,2})/);
-      if (rocMatch) {
-        const rocYear = parseInt(rocMatch[1]);
-        const month = rocMatch[2].padStart(2, '0');
-        const day = rocMatch[3].padStart(2, '0');
-        const adYear = rocYear + 1911;
-        personalInfo.birthDateAD = `${adYear}/${month}/${day}`;
-        console.log('找到出生日期:', personalInfo.birthDate, '(西元年:', personalInfo.birthDateAD + ')');
-      } else {
-        console.log('找到出生日期:', personalInfo.birthDate);
-      }
-    }
-    
-    // 擷取性別
-    const genderElement = document.querySelector('.sex');
-    if (genderElement) {
-      personalInfo.gender = genderElement.textContent.trim();
-      console.log('找到性別:', personalInfo.gender);
-    }
-    
-    // 添加擷取時間和來源
-    personalInfo.extractedAt = new Date().toISOString();
-    personalInfo.source = document.title || window.location.href;
-    
-    // 檢查是否有找到任何個人資料
-    const hasData = Object.keys(personalInfo).some(key => 
-      key !== 'extractedAt' && key !== 'source' && personalInfo[key]
-    );
-    
-    if (hasData) {
-      console.log('成功擷取個人資料:', personalInfo);
-      return personalInfo;
-    } else {
-      console.log('未找到個人資料');
-      return null;
-    }
-  } catch (error) {
-    console.error('擷取個人資料時發生錯誤:', error);
-    return null;
-  }
-}
-
-// 使用通用方法擷取個人資料（備用方案）
-function extractPersonalInfoGeneric() {
-  try {
-    console.log('使用通用方法擷取個人資料...');
-    
-    const personalInfo = {};
-    const pageText = document.body.textContent;
-    
-    // 使用正則表達式尋找身分證號
-    const idPattern = /身分證號[：:]\s*([A-Z]\d{2}\*{3}\d{3}|[A-Z]\d{9})/;
-    const idMatch = pageText.match(idPattern);
-    if (idMatch) {
-      personalInfo.idNumber = idMatch[1];
-      console.log('通用方法找到身分證號:', personalInfo.idNumber);
-    }
-    
-    // 使用正則表達式尋找民國年出生日期
-    const birthPattern = /民\s*(\d{2,3})\/(\d{1,2})\/(\d{1,2})/;
-    const birthMatch = pageText.match(birthPattern);
-    if (birthMatch) {
-      personalInfo.birthDate = `民 ${birthMatch[1]}/${birthMatch[2]}/${birthMatch[3]}`;
-      const rocYear = parseInt(birthMatch[1]);
-      const month = birthMatch[2].padStart(2, '0');
-      const day = birthMatch[3].padStart(2, '0');
-      const adYear = rocYear + 1911;
-      personalInfo.birthDateAD = `${adYear}/${month}/${day}`;
-      console.log('通用方法找到出生日期:', personalInfo.birthDate);
-    }
-    
-    // 添加擷取時間和來源
-    personalInfo.extractedAt = new Date().toISOString();
-    personalInfo.source = document.title || window.location.href;
-    
-    // 檢查是否有找到任何個人資料
-    const hasData = Object.keys(personalInfo).some(key => 
-      key !== 'extractedAt' && key !== 'source' && personalInfo[key]
-    );
-    
-    return hasData ? personalInfo : null;
-  } catch (error) {
-    console.error('通用個人資料擷取時發生錯誤:', error);
-    return null;
-  }
-}
-
-// 主要個人資料擷取函數
-function getPersonalInfo() {
-  // 優先使用特定選擇器方法
-  let personalInfo = extractPersonalInfo();
-  
-  // 如果失敗，使用通用方法
-  if (!personalInfo) {
-    personalInfo = extractPersonalInfoGeneric();
-  }
-  
-  return personalInfo;
-}
+console.log('醫療資料頁面監測工具內容腳本已載入 (URL 跳轉監測版 + 狀態持久化)');
 

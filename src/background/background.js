@@ -178,8 +178,16 @@ async function saveExtractedData(extractedData, tabId) {
   try {
     console.log('開始儲存擷取的資料...');
     
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const dateStr = new Date().toLocaleDateString('zh-TW').replace(/\//g, '');
+    // 生成時間戳記（yyyy:mm:dd_hh:mm:ss 格式）
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    const second = String(now.getSeconds()).padStart(2, '0');
+    
+    const timeStamp = `${year}:${month}:${day}_${hour}:${minute}:${second}`;
     
     // 獲取標籤頁資訊
     let tabInfo;
@@ -190,18 +198,25 @@ async function saveExtractedData(extractedData, tabId) {
       tabInfo = { url: 'unknown', title: 'unknown' };
     }
     
-    // 生成檔案名稱
-    let filePrefix = '醫療資料';
+    // 生成檔案名稱和資料夾
+    let baseName = '醫療資料';
     if (tabInfo.title && tabInfo.title.includes('健保')) {
-      filePrefix = '健保醫療資料';
+      baseName = '健保醫療資料';
     } else if (tabInfo.url && tabInfo.url.includes('medcloud')) {
-      filePrefix = '健保雲端資料';
+      baseName = '健保雲端資料';
     }
+    
+    // 資料夾名稱：yyyy:mm:dd_hh:mm:ss_{name}
+    const folderName = `${timeStamp}_${baseName}`;
+    
+    // 檔案名稱
+    const csvFilename = `${folderName}/data.csv`;
+    const jsonFilename = `${folderName}/data.json`;
+    const infoFilename = `${folderName}/info.txt`;
     
     // 準備 CSV 資料
     console.log('準備 CSV 資料...');
     const csvData = convertToCSV(extractedData.tableData, extractedData.personalInfo);
-    const csvFilename = `${filePrefix}_${dateStr}_${timestamp}.csv`;
     
     // 準備 JSON 資料
     console.log('準備 JSON 資料...');
@@ -213,16 +228,36 @@ async function saveExtractedData(extractedData, tabId) {
           title: tabInfo.title
         },
         dataCount: extractedData.tableData ? extractedData.tableData.length : 0,
-        version: '2.0.4'
+        version: '2.0.5',
+        folderName: folderName
       },
       personalInfo: extractedData.personalInfo,
       tableData: extractedData.tableData
     };
     
-    const jsonFilename = `${filePrefix}_${dateStr}_${timestamp}.json`;
+    // 準備資訊檔案
+    const infoData = `擷取資訊
+================
+擷取時間: ${new Date().toLocaleString('zh-TW')}
+資料來源: ${tabInfo.url}
+頁面標題: ${tabInfo.title}
+資料筆數: ${extractedData.tableData ? extractedData.tableData.length : 0}
+工具版本: 2.0.5
+資料夾名稱: ${folderName}
+
+檔案說明:
+- data.csv: 表格資料（CSV 格式）
+- data.json: 完整資料（JSON 格式）
+- info.txt: 擷取資訊（此檔案）
+
+個人資料:
+${extractedData.personalInfo ? Object.entries(extractedData.personalInfo)
+  .map(([key, value]) => `- ${key}: ${value}`)
+  .join('\n') : '- 無個人資料'}
+`;
     
-    // 使用 Data URL 方式下載檔案（相容 Service Worker）
-    console.log('使用 Data URL 方式下載 CSV 檔案...');
+    // 使用 Data URL 方式下載檔案到資料夾
+    console.log('下載 CSV 檔案到資料夾:', csvFilename);
     const csvDataUrl = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
     
     try {
@@ -237,7 +272,7 @@ async function saveExtractedData(extractedData, tabId) {
       throw new Error('CSV 檔案下載失敗: ' + csvError.message);
     }
     
-    console.log('使用 Data URL 方式下載 JSON 檔案...');
+    console.log('下載 JSON 檔案到資料夾:', jsonFilename);
     const jsonDataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(jsonData, null, 2));
     
     try {
@@ -252,14 +287,31 @@ async function saveExtractedData(extractedData, tabId) {
       throw new Error('JSON 檔案下載失敗: ' + jsonError.message);
     }
     
-    console.log('所有檔案儲存成功');
+    console.log('下載資訊檔案到資料夾:', infoFilename);
+    const infoDataUrl = 'data:text/plain;charset=utf-8,' + encodeURIComponent(infoData);
+    
+    try {
+      await chrome.downloads.download({
+        url: infoDataUrl,
+        filename: infoFilename,
+        saveAs: false
+      });
+      console.log('資訊檔案下載成功:', infoFilename);
+    } catch (infoError) {
+      console.error('資訊檔案下載失敗:', infoError);
+      // 資訊檔案失敗不影響主要功能
+      console.warn('資訊檔案下載失敗，但主要檔案已成功下載');
+    }
+    
+    console.log('所有檔案儲存成功到資料夾:', folderName);
     
     // 儲存到本地存儲（用於歷史記錄）
     const historyData = {
       timestamp: extractedData.timestamp || new Date().toISOString(),
       dataCount: extractedData.tableData ? extractedData.tableData.length : 0,
       source: tabInfo.url,
-      files: [csvFilename, jsonFilename]
+      folderName: folderName,
+      files: [csvFilename, jsonFilename, infoFilename]
     };
     
     // 獲取現有歷史記錄
@@ -282,7 +334,8 @@ async function saveExtractedData(extractedData, tabId) {
     
     return { 
       success: true, 
-      files: [csvFilename, jsonFilename],
+      folderName: folderName,
+      files: [csvFilename, jsonFilename, infoFilename],
       dataCount: extractedData.tableData ? extractedData.tableData.length : 0
     };
     
