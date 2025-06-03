@@ -28,3 +28,10 @@
 - [x] 設定 GitHub 認證
 - [x] 上傳到 https://github.com/henry1266/predownload.git
 
+## 第六階段：改進瀏覽器 ICON 監測狀態顯示
+- [x] 設計綠色播放圖示（監測中）
+- [x] 設計紅色禁止圖示（停止監測）
+- [x] 修改 background.js 實作 ICON 狀態切換
+- [x] 確保未開啟 popup 時也能顯示監測狀態
+- [x] 測試 ICON 狀態切換功能
+- [ ] 提交更新到 GitHub 倉庫

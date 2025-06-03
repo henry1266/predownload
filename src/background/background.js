@@ -6,6 +6,25 @@ let monitoringTabs = new Map(); // 記錄正在監測的標籤頁
 let lastNotificationTime = 0;
 const NOTIFICATION_COOLDOWN = 5000; // 通知冷卻時間 5 秒
 
+// 瀏覽器圖示路徑
+const BROWSER_ICONS = {
+  DEFAULT: {
+    16: 'assets/icon16.png',
+    48: 'assets/icon48.png',
+    128: 'assets/icon128.png'
+  },
+  MONITORING: {
+    16: 'assets/browser_icons/icon_monitoring.png',
+    48: 'assets/browser_icons/icon_monitoring.png',
+    128: 'assets/browser_icons/icon_monitoring.png'
+  },
+  STOPPED: {
+    16: 'assets/browser_icons/icon_stopped.png',
+    48: 'assets/browser_icons/icon_stopped.png',
+    128: 'assets/browser_icons/icon_stopped.png'
+  }
+}
+
 // 監聽擴充功能安裝事件
 chrome.runtime.onInstalled.addListener(() => {
   console.log('醫療資料頁面監測工具已安裝 (修正版)');
@@ -17,6 +36,12 @@ chrome.runtime.onInstalled.addListener(() => {
     monitoringEnabled: false,
     lastProcessedData: null
   });
+  
+  // 初始化設置停止狀態圖示
+  chrome.action.setIcon({
+    path: BROWSER_ICONS.STOPPED
+  });
+  console.log('初始化設置圖示為停止狀態');
 });
 
 // 監聽來自內容腳本的消息
@@ -43,6 +68,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       
     case 'updateMonitoringStatus':
       updateMonitoringStatus(sender.tab.id, message.status);
+      sendResponse({ success: true });
+      break;
+      
+    case 'startMonitoring':
+      console.log(`標籤頁 ${sender.tab.id} 開始監測`);
+      updateMonitoringStatus(sender.tab.id, { isMonitoring: true });
+      sendResponse({ success: true });
+      break;
+      
+    case 'stopMonitoring':
+      console.log(`標籤頁 ${sender.tab.id} 停止監測`);
+      monitoringTabs.delete(sender.tab.id);
+      // 檢查是否還有其他標籤頁在監測中
+      if (monitoringTabs.size === 0) {
+        chrome.action.setIcon({
+          path: BROWSER_ICONS.STOPPED
+        });
+      }
       sendResponse({ success: true });
       break;
       
@@ -422,8 +465,38 @@ function updateMonitoringStatus(tabId, status) {
     
     monitoringTabs.set(tabId, updatedStatus);
     console.log(`標籤頁 ${tabId} 監測狀態已更新:`, updatedStatus);
+    
+    // 更新瀏覽器圖示狀態
+    updateBrowserIcon(tabId, updatedStatus);
   } catch (error) {
     console.error('更新監測狀態時發生錯誤:', error);
+  }
+}
+
+// 更新瀏覽器圖示狀態
+function updateBrowserIcon(tabId, status) {
+  try {
+    // 檢查是否有監測狀態
+    const isMonitoring = status && monitoringTabs.has(tabId);
+    
+    // 根據監測狀態設置圖示
+    if (isMonitoring) {
+      console.log(`設置標籤頁 ${tabId} 的圖示為監測中狀態`);
+      chrome.action.setIcon({
+        path: BROWSER_ICONS.MONITORING
+      });
+    } else {
+      console.log(`設置標籤頁 ${tabId} 的圖示為停止狀態`);
+      chrome.action.setIcon({
+        path: BROWSER_ICONS.STOPPED
+      });
+    }
+  } catch (error) {
+    console.error('更新瀏覽器圖示時發生錯誤:', error);
+    // 發生錯誤時恢復為預設圖示
+    chrome.action.setIcon({
+      path: BROWSER_ICONS.DEFAULT
+    });
   }
 }
 
@@ -432,6 +505,15 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   if (monitoringTabs.has(tabId)) {
     console.log(`標籤頁 ${tabId} 已關閉，清理監測狀態`);
     monitoringTabs.delete(tabId);
+    
+    // 檢查是否還有其他標籤頁在監測中
+    if (monitoringTabs.size === 0) {
+      // 所有監測標籤頁都已關閉，設置為停止狀態
+      chrome.action.setIcon({
+        path: BROWSER_ICONS.STOPPED
+      });
+      console.log('所有監測標籤頁已關閉，設置圖示為停止狀態');
+    }
   }
 });
 
