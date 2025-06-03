@@ -7,6 +7,13 @@ let monitoringStatus = false;
 let statusCheckInterval = null;
 let currentTabInfo = null;
 
+// 狀態圖示路徑
+const STATUS_ICONS = {
+  STOPPED: '../../assets/status_icons/status_stopped.png',
+  RUNNING: '../../assets/status_icons/status_running.png',
+  ERROR: '../../assets/status_icons/status_error.png'
+};
+
 // 格式化錯誤訊息的輔助函數
 function formatErrorMessage(error) {
   if (!error) return '未知錯誤';
@@ -59,7 +66,7 @@ function formatTime(isoString) {
 
 // 更新監測狀態顯示
 function updateMonitoringStatus(status) {
-  const statusDot = document.getElementById('statusDot');
+  const statusIcon = document.getElementById('statusIcon');
   const statusText = document.getElementById('statusText');
   const toggleBtn = document.getElementById('toggleMonitorBtn');
   const monitorIcon = document.getElementById('monitorIcon');
@@ -68,7 +75,7 @@ function updateMonitoringStatus(status) {
   
   if (status.isMonitoring) {
     // 監測中
-    statusDot.className = 'status-dot active';
+    statusIcon.src = STATUS_ICONS.RUNNING;
     
     // 根據頁面狀態顯示不同的監測狀態
     if (status.isOnTargetPage) {
@@ -97,7 +104,7 @@ function updateMonitoringStatus(status) {
     monitoringStatus = true;
   } else {
     // 未監測
-    statusDot.className = 'status-dot inactive';
+    statusIcon.src = STATUS_ICONS.STOPPED;
     statusText.textContent = '監測已停止';
     
     // 顯示當前頁面狀態
@@ -152,6 +159,7 @@ function toggleMonitoring() {
   
   const toggleBtn = document.getElementById('toggleMonitorBtn');
   const monitorBtnText = document.getElementById('monitorBtnText');
+  const statusIcon = document.getElementById('statusIcon');
   
   // 暫時禁用按鈕
   toggleBtn.disabled = true;
@@ -163,6 +171,9 @@ function toggleMonitoring() {
     if (chrome.runtime.lastError) {
       const errorMessage = formatErrorMessage(chrome.runtime.lastError);
       console.error('切換監測狀態失敗:', errorMessage);
+      
+      // 顯示錯誤狀態圖示
+      statusIcon.src = STATUS_ICONS.ERROR;
       
       // 如果是通信錯誤，嘗試注入內容腳本
       if (isHarmlessCommunicationError(errorMessage)) {
@@ -213,6 +224,11 @@ function handleToggleResponse(response) {
   } else {
     const errorMessage = response ? response.message : '操作失敗';
     console.error('監測操作失敗:', errorMessage);
+    
+    // 顯示錯誤狀態圖示
+    const statusIcon = document.getElementById('statusIcon');
+    statusIcon.src = STATUS_ICONS.ERROR;
+    
     showError('操作失敗: ' + errorMessage);
     
     // 恢復按鈕狀態
