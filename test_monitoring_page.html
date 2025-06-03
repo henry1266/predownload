@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>健保醫療資訊雲端查詢系統 - 測試頁面</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", "微軟正黑體", Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            background-color: #2c5aa0;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .personal-info {
+            background-color: white;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .dataTables_wrapper {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .dataTables_scrollHead {
+            margin-bottom: 10px;
+        }
+        
+        .dataTables_scrollBody {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        
+        .controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        button {
+            background-color: #2c5aa0;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #1a4480;
+        }
+        
+        .status {
+            background-color: #e8f4fd;
+            border: 1px solid #bee5eb;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>健保醫療資訊雲端查詢系統</h1>
+        <p>頁面監測功能測試頁面</p>
+    </div>
+    
+    <div class="personal-info">
+        <h3>個人基本資料</h3>
+        <div class="idno">身分證號：A123***456</div>
+        <div class="name">王小明</div>
+        <div class="birth">民 85/03/15</div>
+        <div class="sex">男</div>
+    </div>
+    
+    <div class="controls">
+        <button onclick="addNewRecord()">新增記錄</button>
+        <button onclick="modifyRecord()">修改記錄</button>
+        <button onclick="deleteRecord()">刪除記錄</button>
+        <button onclick="refreshData()">重新載入資料</button>
+    </div>
+    
+    <div class="status" id="status">
+        狀態：頁面已載入，等待操作...
+    </div>
+    
+    <div class="dataTables_wrapper">
+        <div class="dataTables_scrollHead">
+            <table>
+                <thead>
+                    <tr>
+                        <th>就醫日期</th>
+                        <th>醫療院所</th>
+                        <th>科別</th>
+                        <th>診斷</th>
+                        <th>藥品名稱</th>
+                        <th>來源</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+        
+        <div class="dataTables_scrollBody">
+            <table>
+                <tbody id="dataTable">
+                    <tr>
+                        <td>114/05/15</td>
+                        <td>台大醫院</td>
+                        <td>內科</td>
+                        <td>感冒</td>
+                        <td>普拿疼</td>
+                        <td>台大醫院<br>門診<br>0501060029</td>
+                    </tr>
+                    <tr>
+                        <td>114/05/10</td>
+                        <td>榮總醫院</td>
+                        <td>外科</td>
+                        <td>外傷</td>
+                        <td>消炎藥</td>
+                        <td>榮總醫院<br>急診<br>0501060030</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        let recordCount = 2;
+        
+        function updateStatus(message) {
+            document.getElementById('status').textContent = '狀態：' + message;
+        }
+        
+        function addNewRecord() {
+            const tableBody = document.getElementById('dataTable');
+            recordCount++;
+            
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+                <td>114/06/0${recordCount}</td>
+                <td>新光醫院</td>
+                <td>皮膚科</td>
+                <td>濕疹</td>
+                <td>類固醇藥膏</td>
+                <td>新光醫院<br>門診<br>050106003${recordCount}</td>
+            `;
+            
+            tableBody.appendChild(newRow);
+            updateStatus(`新增記錄完成，目前共 ${recordCount} 筆記錄`);
+        }
+        
+        function modifyRecord() {
+            const rows = document.querySelectorAll('#dataTable tr');
+            if (rows.length > 0) {
+                const lastRow = rows[rows.length - 1];
+                const cells = lastRow.querySelectorAll('td');
+                if (cells.length > 3) {
+                    cells[3].textContent = '已修改的診斷';
+                }
+                updateStatus('最後一筆記錄已修改');
+            }
+        }
+        
+        function deleteRecord() {
+            const tableBody = document.getElementById('dataTable');
+            const rows = tableBody.querySelectorAll('tr');
+            if (rows.length > 1) {
+                tableBody.removeChild(rows[rows.length - 1]);
+                recordCount--;
+                updateStatus(`刪除記錄完成，目前共 ${recordCount} 筆記錄`);
+            } else {
+                updateStatus('無法刪除，至少需保留一筆記錄');
+            }
+        }
+        
+        function refreshData() {
+            updateStatus('正在重新載入資料...');
+            
+            // 模擬載入延遲
+            setTimeout(() => {
+                const tableBody = document.getElementById('dataTable');
+                
+                // 清空現有資料
+                tableBody.innerHTML = '';
+                
+                // 重新載入基本資料
+                const baseRecords = [
+                    ['114/05/15', '台大醫院', '內科', '感冒', '普拿疼', '台大醫院<br>門診<br>0501060029'],
+                    ['114/05/10', '榮總醫院', '外科', '外傷', '消炎藥', '榮總醫院<br>急診<br>0501060030']
+                ];
+                
+                // 隨機添加新記錄
+                const randomRecords = [
+                    ['114/06/01', '馬偕醫院', '眼科', '近視', '眼藥水', '馬偕醫院<br>門診<br>0501060031'],
+                    ['114/06/02', '長庚醫院', '耳鼻喉科', '中耳炎', '抗生素', '長庚醫院<br>門診<br>0501060032'],
+                    ['114/06/03', '亞東醫院', '骨科', '扭傷', '止痛藥', '亞東醫院<br>急診<br>0501060033']
+                ];
+                
+                // 添加基本記錄
+                baseRecords.forEach(record => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = record.map(cell => `<td>${cell}</td>`).join('');
+                    tableBody.appendChild(row);
+                });
+                
+                // 隨機添加1-3筆新記錄
+                const newRecordCount = Math.floor(Math.random() * 3) + 1;
+                for (let i = 0; i < newRecordCount; i++) {
+                    if (i < randomRecords.length) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = randomRecords[i].map(cell => `<td>${cell}</td>`).join('');
+                        tableBody.appendChild(row);
+                    }
+                }
+                
+                recordCount = baseRecords.length + newRecordCount;
+                updateStatus(`資料重新載入完成，共 ${recordCount} 筆記錄`);
+            }, 1000);
+        }
+        
+        // 頁面載入完成後的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus('頁面載入完成，可以開始測試監測功能');
+            
+            // 每30秒自動刷新一次資料（模擬真實系統的自動更新）
+            setInterval(() => {
+                if (Math.random() > 0.7) { // 30%機率自動更新
+                    refreshData();
+                }
+            }, 30000);
+        });
+    </script>
+</body>
+</html>
+

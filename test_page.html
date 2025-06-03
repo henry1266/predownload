@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>健保醫療資訊雲端查詢系統 - 測試頁面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .logo a {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            text-decoration: none;
+        }
+        
+        .function-tab {
+            margin: 20px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .function-tab a {
+            display: inline-block;
+            padding: 10px 15px;
+            margin-right: 5px;
+            background-color: #f0f0f0;
+            color: #333;
+            text-decoration: none;
+            border: 1px solid #ddd;
+            border-bottom: none;
+        }
+        
+        .function-tab a.current {
+            background-color: #fff;
+            border-bottom: 1px solid #fff;
+        }
+        
+        .dataTables_wrapper {
+            margin: 20px 0;
+        }
+        
+        .dataTables_scrollHead {
+            overflow: hidden;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+        }
+        
+        .dataTables_scrollBody {
+            overflow: auto;
+            border: 1px solid #ddd;
+            border-top: none;
+            max-height: 400px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-right: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #f9f9f9;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        
+        td {
+            border-bottom: 1px solid #eee;
+        }
+        
+        .bg-green {
+            background-color: #f0fff0;
+        }
+        
+        .sorting_1 {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="all-wrap">
+        <header>
+            <div class="logo">
+                <a href="#">健保醫療資訊雲端查詢系統<br><span>NHI MediCloud System</span></a>
+            </div>
+            
+            <div class="function-tab">
+                <a href="#" title="摘要">摘要</a>
+                <a href="#" class="current" title="西醫用藥">西醫用藥</a>
+                <a href="#" title="中醫醫療">中醫醫療</a>
+                <a href="#" title="牙科處置紀錄">牙科處置紀錄</a>
+                <a href="#" title="過敏紀錄">過敏紀錄</a>
+                <a href="#" title="檢查與檢驗">檢查與檢驗</a>
+            </div>
+        </header>
+        
+        <main>
+            <div class="table-content-scroll">
+                <div class="table-content-wrap">
+                    <div id="TableDiv">
+                        <div id="DataTables_Table_0_wrapper" class="dataTables_wrapper no-footer">
+                            <!-- 表頭區域 -->
+                            <div class="dataTables_scrollHead">
+                                <div class="dataTables_scrollHeadInner">
+                                    <table class="table table-bordered mb-none table-default dataTable no-footer">
+                                        <thead>
+                                            <tr role="row">
+                                                <th class="sorting">項次</th>
+                                                <th class="sorting_desc">就醫日期</th>
+                                                <th class="sorting">來源</th>
+                                                <th class="sorting">就醫序號</th>
+                                                <th class="sorting">主診斷</th>
+                                                <th class="sorting">藥品代碼</th>
+                                                <th class="sorting">藥品名稱</th>
+                                                <th class="sorting">成分名稱</th>
+                                                <th class="sorting">用法用量</th>
+                                                <th class="sorting">給藥日數</th>
+                                                <th class="sorting">藥品用量</th>
+                                                <th class="sorting">單筆餘藥日數試算</th>
+                                                <th class="sorting">ATC3名稱</th>
+                                                <th class="sorting">ATC7代碼</th>
+                                            </tr>
+                                        </thead>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- 資料區域 -->
+                            <div class="dataTables_scrollBody">
+                                <table class="table table-bordered mb-none table-default dataTable no-footer" id="DataTables_Table_0">
+                                    <thead>
+                                        <tr role="row" style="height: 0px;">
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                            <th style="height: 0px; padding: 0; border: 0;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr role="row" class="odd bg-green">
+                                            <td>1</td>
+                                            <td class="sorting_1">114/05/31</td>
+                                            <td>桃園長庚<br>門診<br>1132071036</td>
+                                            <td>XXXX</td>
+                                            <td>有猝倒的猝睡症<br>G47411</td>
+                                            <td>VC00010100</td>
+                                            <td>PROVIGIL TABLETS 200MG</td>
+                                            <td>Modafinil</td>
+                                            <td>QD</td>
+                                            <td>30</td>
+                                            <td>30</td>
+                                            <td>27</td>
+                                            <td>Psychoanaleptics</td>
+                                            <td>N06BA07</td>
+                                        </tr>
+                                        <tr role="row" class="even bg-green">
+                                            <td>2</td>
+                                            <td class="sorting_1">114/05/31</td>
+                                            <td>桃園長庚<br>門診<br>1132071036</td>
+                                            <td>0013</td>
+                                            <td>有猝倒的猝睡症<br>G47411</td>
+                                            <td>VC00010100</td>
+                                            <td>PROVIGIL TABLETS 200MG</td>
+                                            <td>Modafinil</td>
+                                            <td>QD</td>
+                                            <td>30</td>
+                                            <td>30</td>
+                                            <td>27</td>
+                                            <td>Psychoanaleptics</td>
+                                            <td>N06BA07</td>
+                                        </tr>
+                                        <tr role="row" class="odd">
+                                            <td>3</td>
+                                            <td class="sorting_1">114/04/26</td>
+                                            <td>桃園長庚<br>門診<br>1132071036</td>
+                                            <td>XXXX</td>
+                                            <td>有猝倒的猝睡症<br>G47411</td>
+                                            <td>VC00010100</td>
+                                            <td>PROVIGIL TABLETS 200MG</td>
+                                            <td>Modafinil</td>
+                                            <td>QD</td>
+                                            <td>30</td>
+                                            <td>30</td>
+                                            <td>26</td>
+                                            <td>Psychoanaleptics</td>
+                                            <td>N06BA07</td>
+                                        </tr>
+                                        <tr role="row" class="even">
+                                            <td>4</td>
+                                            <td class="sorting_1">114/03/29</td>
+                                            <td>台北榮總<br>門診<br>1132071037</td>
+                                            <td>0001</td>
+                                            <td>高血壓<br>I10</td>
+                                            <td>AC44010100</td>
+                                            <td>NORVASC TABLETS 5MG</td>
+                                            <td>Amlodipine</td>
+                                            <td>QD</td>
+                                            <td>28</td>
+                                            <td>28</td>
+                                            <td>25</td>
+                                            <td>Calcium channel blockers</td>
+                                            <td>C08CA01</td>
+                                        </tr>
+                                        <tr role="row" class="odd">
+                                            <td>5</td>
+                                            <td class="sorting_1">114/02/15</td>
+                                            <td>台大醫院<br>急診<br>1132071038</td>
+                                            <td>ER01</td>
+                                            <td>急性上呼吸道感染<br>J06.9</td>
+                                            <td>AB01010100</td>
+                                            <td>AMOXICILLIN CAPSULES 250MG</td>
+                                            <td>Amoxicillin</td>
+                                            <td>TID</td>
+                                            <td>7</td>
+                                            <td>21</td>
+                                            <td>0</td>
+                                            <td>Beta-lactam antibacterials, penicillins</td>
+                                            <td>J01CA04</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // 模擬一些基本的互動功能
+        console.log('健保醫療資訊雲端查詢系統測試頁面已載入');
+        
+        // 添加一些測試用的JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('頁面DOM已載入完成');
+            
+            // 檢查表格結構
+            const dataTables = document.querySelector('.dataTables_wrapper');
+            if (dataTables) {
+                console.log('找到 DataTables 結構');
+                
+                const scrollHead = dataTables.querySelector('.dataTables_scrollHead');
+                const scrollBody = dataTables.querySelector('.dataTables_scrollBody');
+                
+                if (scrollHead) {
+                    console.log('找到表頭區域，表頭數量:', scrollHead.querySelectorAll('th').length);
+                }
+                
+                if (scrollBody) {
+                    const dataRows = scrollBody.querySelectorAll('tbody tr');
+                    console.log('找到資料區域，資料行數:', dataRows.length);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+

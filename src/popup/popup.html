@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>醫療資料頁面監測工具</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>醫療資料頁面監測工具</h1>
+      <div class="version">v2.0.0</div>
+    </header>
+    
+    <main>
+      <!-- 監測狀態面板 -->
+      <div class="monitor-panel">
+        <div class="monitor-status" id="monitorStatus">
+          <div class="status-indicator" id="statusIndicator">
+            <span class="status-dot" id="statusDot"></span>
+            <span class="status-text" id="statusText">檢查中...</span>
+          </div>
+          <div class="monitor-info" id="monitorInfo" style="display: none;">
+            <div class="info-item">
+              <span class="label">開始時間:</span>
+              <span class="value" id="startTime">--</span>
+            </div>
+            <div class="info-item">
+              <span class="label">最後活動:</span>
+              <span class="value" id="lastActivity">--</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="monitor-controls">
+          <button id="toggleMonitorBtn" class="monitor-btn" disabled>
+            <span class="icon" id="monitorIcon">⏸️</span>
+            <span class="text" id="monitorBtnText">載入中...</span>
+          </button>
+        </div>
+      </div>
+      
+      <!-- 分隔線 -->
+      <div class="divider"></div>
+      
+      <!-- 手動操作面板 -->
+      <div class="action-panel">
+        <h3>手動操作</h3>
+        <button id="captureBtn" class="primary-btn">
+          <span class="icon">📷</span>
+          截圖並擷取資料
+        </button>
+      </div>
+      
+      <!-- 狀態面板 -->
+      <div class="status-panel" id="statusPanel" style="display: none;">
+        <div class="status-message" id="statusMessage">處理中...</div>
+        <div class="progress-bar">
+          <div class="progress" id="progressBar"></div>
+        </div>
+      </div>
+      
+      <!-- 目標網址資訊 -->
+      <div class="target-info">
+        <h4>監測目標</h4>
+        <div class="target-url">
+          https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008
+        </div>
+        <div class="target-note">
+          當此網址的頁面被刷新且檢測到新資料時，工具會自動執行擷取動作
+        </div>
+      </div>
+    </main>
+    
+    <footer>
+      <div class="footer-links">
+        <a href="#" id="helpLink">說明</a>
+        <a href="#" id="settingsLink">設定</a>
+      </div>
+    </footer>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>健保醫療資訊雲端查詢系統 - 測試頁面</title>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #2c5aa0;
+            color: white;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .logo a {
+            color: white;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .function-tabs {
+            margin-bottom: 20px;
+        }
+        .function-tab {
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .function-tab a {
+            background-color: #4a90e2;
+            color: white;
+            padding: 8px 15px;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .function-tab.active a {
+            background-color: #2c5aa0;
+        }
+        .personal-info {
+            background-color: white;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .personal-info h3 {
+            margin-top: 0;
+            color: #2c5aa0;
+        }
+        .info-row {
+            margin-bottom: 10px;
+        }
+        .idno, .name, .birth, .sex {
+            display: inline-block;
+            margin-right: 20px;
+            padding: 5px;
+        }
+        .idno {
+            background-color: #e8f4fd;
+            border: 1px solid #b3d9ff;
+        }
+        .name {
+            background-color: #fff2e8;
+            border: 1px solid #ffcc99;
+            font-weight: bold;
+        }
+        .birth {
+            background-color: #f0f8e8;
+            border: 1px solid #ccffcc;
+        }
+        .sex {
+            background-color: #fdf0f8;
+            border: 1px solid #ffb3d9;
+        }
+        .sline {
+            display: block;
+            height: 1px;
+            background-color: #ddd;
+            margin: 10px 0;
+        }
+        .content-area {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        table.dataTable {
+            width: 100% !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <a href="#">健保醫療資訊雲端查詢系統 NHI MediCloud System</a>
+        </div>
+    </div>
+
+    <div class="function-tabs">
+        <div class="function-tab"><a href="#">摘要</a></div>
+        <div class="function-tab active"><a href="#">西醫用藥</a></div>
+        <div class="function-tab"><a href="#">中醫醫療</a></div>
+        <div class="function-tab"><a href="#">牙科處置紀錄</a></div>
+        <div class="function-tab"><a href="#">過敏紀錄</a></div>
+        <div class="function-tab"><a href="#">檢查與檢驗</a></div>
+    </div>
+
+    <!-- 個人基本資料區塊 -->
+    <div class="personal-info">
+        <h3>個人基本資料</h3>
+        <div class="info-row">
+            <span class="idno">身分證號： A126***550</span>
+            <span class="name">鄭暄瀚</span>
+            <span class="birth">民 84/06/19</span>
+            <span class="sex">男</span>
+            <span class="sline"></span>
+        </div>
+    </div>
+
+    <div class="content-area">
+        <h3>西醫用藥紀錄</h3>
+        <table id="medicationTable" class="display" style="width:100%">
+            <thead>
+                <tr>
+                    <th>項次</th>
+                    <th>就醫日期</th>
+                    <th>來源</th>
+                    <th>就醫序號</th>
+                    <th>主診斷</th>
+                    <th>藥品代碼</th>
+                    <th>藥品名稱</th>
+                    <th>成分名稱</th>
+                    <th>用法用量</th>
+                    <th>給藥日數</th>
+                    <th>藥品用量</th>
+                    <th>單筆餘藥日數試算</th>
+                    <th>ATC3名稱</th>
+                    <th>ATC7代碼</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>114/05/31</td>
+                    <td>桃園長庚<br>門診<br>1132071036</td>
+                    <td>XXXX</td>
+                    <td>有猝倒的猝睡症<br>G47411</td>
+                    <td>VC00010100</td>
+                    <td>PROVIGIL TABLETS 200MG</td>
+                    <td>Modafinil</td>
+                    <td>QD</td>
+                    <td>30</td>
+                    <td>30</td>
+                    <td>27</td>
+                    <td>Psychoanaleptics</td>
+                    <td>N06BA07</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>114/05/31</td>
+                    <td>桃園長庚<br>門診<br>1132071036</td>
+                    <td>0013</td>
+                    <td>有猝倒的猝睡症<br>G47411</td>
+                    <td>VC00010100</td>
+                    <td>PROVIGIL TABLETS 200MG</td>
+                    <td>Modafinil</td>
+                    <td>QD</td>
+                    <td>30</td>
+                    <td>30</td>
+                    <td>27</td>
+                    <td>Psychoanaleptics</td>
+                    <td>N06BA07</td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>114/04/26</td>
+                    <td>桃園長庚<br>門診<br>1132071036</td>
+                    <td>XXXX</td>
+                    <td>有猝倒的猝睡症<br>G47411</td>
+                    <td>VC00010100</td>
+                    <td>PROVIGIL TABLETS 200MG</td>
+                    <td>Modafinil</td>
+                    <td>QD</td>
+                    <td>30</td>
+                    <td>30</td>
+                    <td>26</td>
+                    <td>Psychoanaleptics</td>
+                    <td>N06BA07</td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td>114/03/29</td>
+                    <td>台北榮總<br>門診<br>1132071037</td>
+                    <td>0001</td>
+                    <td>高血壓<br>I10</td>
+                    <td>AC44010100</td>
+                    <td>NORVASC TABLETS 5MG</td>
+                    <td>Amlodipine</td>
+                    <td>QD</td>
+                    <td>28</td>
+                    <td>28</td>
+                    <td>25</td>
+                    <td>Calcium channel blockers</td>
+                    <td>C08CA01</td>
+                </tr>
+                <tr>
+                    <td>5</td>
+                    <td>114/02/15</td>
+                    <td>台大醫院<br>急診<br>1132071038</td>
+                    <td>ER01</td>
+                    <td>急性上呼吸道感染<br>J06.9</td>
+                    <td>AB01010100</td>
+                    <td>AMOXICILLIN CAPSULES 250MG</td>
+                    <td>Amoxicillin</td>
+                    <td>TID</td>
+                    <td>7</td>
+                    <td>21</td>
+                    <td>0</td>
+                    <td>Beta-lactam antibacterials, penicillins</td>
+                    <td>J01CA04</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#medicationTable').DataTable({
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/1.11.5/i18n/zh_Hant.json"
+                },
+                "pageLength": 10,
+                "scrollX": true,
+                "scrollY": "400px",
+                "scrollCollapse": true
+            });
+        });
+    </script>
+</body>
+</html>
+

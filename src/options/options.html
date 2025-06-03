@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>醫療資料一鍵擷取工具 - 設定</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>醫療資料一鍵擷取工具 - 設定</h1>
+    </header>
+    
+    <main>
+      <section class="settings-section">
+        <h2>一般設定</h2>
+        
+        <div class="settings-group">
+          <div class="setting-item">
+            <div class="setting-label">
+              <label for="autoStart">自動啟動</label>
+              <p class="setting-description">在開啟醫療資訊系統網頁時自動啟動工具</p>
+            </div>
+            <div class="setting-control">
+              <label class="switch">
+                <input type="checkbox" id="autoStart">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="setting-item">
+            <div class="setting-label">
+              <label for="showNotification">顯示通知</label>
+              <p class="setting-description">在擷取完成後顯示系統通知</p>
+            </div>
+            <div class="setting-control">
+              <label class="switch">
+                <input type="checkbox" id="showNotification" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <section class="settings-section">
+        <h2>截圖設定</h2>
+        
+        <div class="settings-group">
+          <div class="setting-item">
+            <div class="setting-label">
+              <label for="screenshotQuality">截圖品質</label>
+              <p class="setting-description">設定截圖的品質（較高品質會產生較大的檔案）</p>
+            </div>
+            <div class="setting-control">
+              <select id="screenshotQuality">
+                <option value="0.7">標準</option>
+                <option value="0.85">高</option>
+                <option value="1.0">最高</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="setting-item">
+            <div class="setting-label">
+              <label for="screenshotFormat">截圖格式</label>
+              <p class="setting-description">設定截圖的檔案格式</p>
+            </div>
+            <div class="setting-control">
+              <select id="screenshotFormat">
+                <option value="png">PNG</option>
+                <option value="jpeg">JPEG</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <section class="settings-section">
+        <h2>資料擷取設定</h2>
+        
+        <div class="settings-group">
+          <div class="setting-item">
+            <div class="setting-label">
+              <label for="defaultFormat">預設儲存格式</label>
+              <p class="setting-description">設定資料的預設儲存格式</p>
+            </div>
+            <div class="setting-control">
+              <select id="defaultFormat">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+                <option value="excel">Excel</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="setting-item">
+            <div class="setting-label">
+              <label for="autoDetectTable">自動偵測表格</label>
+              <p class="setting-description">自動偵測頁面中的表格</p>
+            </div>
+            <div class="setting-control">
+              <label class="switch">
+                <input type="checkbox" id="autoDetectTable" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="setting-item">
+            <div class="setting-label">
+              <label for="saveLocation">儲存位置</label>
+              <p class="setting-description">設定檔案的預設儲存位置</p>
+            </div>
+            <div class="setting-control">
+              <input type="text" id="saveLocation" placeholder="預設下載資料夾">
+              <button id="browseFolderBtn" class="secondary-btn">瀏覽...</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <section class="settings-section">
+        <h2>進階設定</h2>
+        
+        <div class="settings-group">
+          <div class="setting-item">
+            <div class="setting-label">
+              <label for="customSelector">自定義表格選擇器</label>
+              <p class="setting-description">使用 CSS 選擇器指定要擷取的表格（進階用戶）</p>
+            </div>
+            <div class="setting-control">
+              <input type="text" id="customSelector" placeholder="例如: #medicalTable, .data-table">
+            </div>
+          </div>
+          
+          <div class="setting-item">
+            <div class="setting-label">
+              <label for="dataProcessing">資料處理</label>
+              <p class="setting-description">設定擷取後的資料處理方式</p>
+            </div>
+            <div class="setting-control">
+              <select id="dataProcessing">
+                <option value="none">不處理</option>
+                <option value="clean">清理空白與特殊字元</option>
+                <option value="format">格式化數字與日期</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    
+    <footer>
+      <div class="actions">
+        <button id="resetBtn" class="secondary-btn">重設為預設值</button>
+        <button id="saveBtn" class="primary-btn">儲存設定</button>
+      </div>
+    </footer>
+  </div>
+  
+  <script src="options.js"></script>
+</body>
+</html>
