@@ -260,51 +260,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// 處理手動擷取請求
-async function handleCaptureAndExtract(tabId, sendResponse) {
-  try {
-    console.log('處理手動擷取請求，標籤頁ID:', tabId);
-    
-    // 向內容腳本發送擷取請求
-    const response = await chrome.tabs.sendMessage(tabId, { action: 'extractTableData' });
-    
-    if (response && response.success) {
-      console.log('擷取成功，開始儲存資料...');
-      
-      // 自動儲存資料
-      const saveResult = await saveExtractedData(response, tabId);
-      
-      if (saveResult.success) {
-        // 顯示成功通知
-        showNotification('擷取完成', `成功擷取並儲存 ${response.tableData.length} 筆資料`, 'success');
-        
-        sendResponse({
-          success: true,
-          message: `擷取完成！已儲存 ${response.tableData.length} 筆資料到下載資料夾`,
-          data: response
-        });
-      } else {
-        sendResponse({
-          success: false,
-          message: '資料擷取成功但儲存失敗: ' + saveResult.error
-        });
-      }
-    } else {
-      const errorMessage = response ? response.message : '擷取失敗';
-      console.error('擷取失敗:', errorMessage);
-      sendResponse({
-        success: false,
-        message: errorMessage
-      });
-    }
-  } catch (error) {
-    console.error('處理擷取請求時發生錯誤:', error);
-    sendResponse({
-      success: false,
-      message: '處理請求時發生錯誤: ' + error.message
-    });
-  }
-}
 
 // 處理資料變化通知（自動觸發）
 async function handleDataChanged(data, tabId) {
@@ -520,78 +475,6 @@ async function saveExtractedData(extractedData, tabId) {
       success: false, 
       error: error.message 
     };
-  }
-}
-
-// 轉換資料為 CSV 格式
-function convertToCSV(tableData, personalInfo) {
-  try {
-    let csvContent = '\uFEFF'; // UTF-8 BOM
-    
-    // 添加個人基本資料（如果有）
-    if (personalInfo) {
-      csvContent += '個人基本資料\n';
-      csvContent += '項目,內容\n';
-      
-      if (personalInfo.idNumber) {
-        csvContent += `身分證號,${personalInfo.idNumber}\n`;
-      }
-      if (personalInfo.name) {
-        csvContent += `姓名,${personalInfo.name}\n`;
-      }
-      if (personalInfo.birthDate) {
-        csvContent += `出生日期,${personalInfo.birthDate}\n`;
-      }
-      if (personalInfo.birthDateAD) {
-        csvContent += `出生日期(西元年),${personalInfo.birthDateAD}\n`;
-      }
-      if (personalInfo.gender) {
-        csvContent += `性別,${personalInfo.gender}\n`;
-      }
-      
-      csvContent += `擷取時間,${personalInfo.extractedAt}\n`;
-      csvContent += `資料來源,${personalInfo.source}\n`;
-      csvContent += '\n'; // 空行分隔
-    }
-    
-    // 添加表格資料
-    if (tableData && tableData.length > 0) {
-      csvContent += '表格資料\n';
-      
-      // 獲取所有欄位名稱
-      const allKeys = new Set();
-      tableData.forEach(row => {
-        Object.keys(row).forEach(key => allKeys.add(key));
-      });
-      const headers = Array.from(allKeys);
-      
-      // 添加表頭
-      csvContent += headers.map(header => `"${header}"`).join(',') + '\n';
-      
-      // 添加資料行
-      tableData.forEach(row => {
-        const values = headers.map(header => {
-          const value = row[header] || '';
-          // 處理包含逗號、引號或換行符的值
-          if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-            return `"${value.replace(/"/g, '""')}"`;
-          }
-          return value;
-        });
-        csvContent += values.join(',') + '\n';
-      });
-    }
-    
-    // 添加擷取資訊
-    csvContent += '\n擷取資訊\n';
-    csvContent += `擷取時間,${new Date().toISOString()}\n`;
-    csvContent += `資料筆數,${tableData ? tableData.length : 0}\n`;
-    csvContent += `工具版本,2.0.0\n`;
-    
-    return csvContent;
-  } catch (error) {
-    console.error('轉換 CSV 時發生錯誤:', error);
-    return '轉換錯誤: ' + error.message;
   }
 }
 
