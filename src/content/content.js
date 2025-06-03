@@ -76,7 +76,7 @@ async function restoreMonitoringState() {
       startMonitoring();
       
       // 顯示恢復通知
-      notifyUser('監測狀態已恢復！繼續監測頁面跳轉', 'success');
+      notifyUser('雲端擷取小幫手運作中', 'success');
       
       // 如果當前在目標頁面，立即檢查一次資料
       if (isOnTargetPage()) {
@@ -221,7 +221,6 @@ function checkUrlChange() {
   
   if (newUrl !== currentUrl) {
     jumpCount++;
-    console.log(`檢測到 URL 跳轉 (第 ${jumpCount} 次):`, currentUrl, '->', newUrl);
     
     // 儲存更新的狀態
     saveMonitoringState();
@@ -466,7 +465,7 @@ function triggerAutoActionAfterJump(tableData, personalInfo) {
         console.log('背景腳本確認處理成功');
         // 顯示成功通知
         const dataCount = tableData ? tableData.length : 0;
-        notifyUser(`跳轉後自動擷取完成！共 ${dataCount} 筆記錄 (第 ${successfulJumps} 次成功跳轉)`, 'success');
+        notifyUser(`自動擷取完成！共 ${dataCount} 筆記錄`, 'success');
       } else {
         console.error('背景腳本處理失敗:', response);
         notifyUser('自動處理失敗', 'error');

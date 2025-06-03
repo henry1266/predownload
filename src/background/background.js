@@ -187,7 +187,7 @@ function isPointNearLine(pt, v1, v2, maxDistance) {
 
 // 監聽擴充功能安裝事件
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('醫療資料頁面監測工具已安裝 (修正版)');
+  console.log('醫療資料頁面監測工具已安裝');
   
   // 設置預設設定
   chrome.storage.local.set({
@@ -312,8 +312,7 @@ async function handleDataChanged(data, tabId) {
           const now = Date.now();
           if (now - lastNotificationTime > NOTIFICATION_COOLDOWN) {
             showNotification(
-              '檢測到新資料', 
-              `自動擷取並儲存了 ${data.tableData.length} 筆新資料`, 
+              ` ${data.tableData.length} 筆新資料`, 
               'success'
             );
             lastNotificationTime = now;
@@ -335,7 +334,6 @@ async function handleDataChanged(data, tabId) {
         showNotification('自動儲存失敗', saveResult.error, 'error');
       }
     } else {
-      console.log('自動儲存已停用，僅顯示通知');
       
       // 即使不儲存資料，也更新監測狀態和圖示
       updateMonitoringStatus(tabId, {
