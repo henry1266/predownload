@@ -119,7 +119,7 @@ function updateMonitoringStatus(status) {
         pageStatus.textContent = '其他健保頁面 - 可開始監測跳轉事件';
         pageStatus.className = 'page-status related';
       } else {
-        pageStatus.textContent = '一般頁面 - 可開始監測跳轉事件';
+        pageStatus.textContent = '一般頁面 - 無法開始監測跳轉事件';
         pageStatus.className = 'page-status general';
       }
     } else {
