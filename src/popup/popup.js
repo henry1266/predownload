@@ -61,11 +61,6 @@ function formatTime(isoString) {
 function updateMonitoringStatus(status) {
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
-  const monitorInfo = document.getElementById('monitorInfo');
-  const startTime = document.getElementById('startTime');
-  const lastActivity = document.getElementById('lastActivity');
-  const jumpCount = document.getElementById('jumpCount');
-  const successfulJumps = document.getElementById('successfulJumps');
   const toggleBtn = document.getElementById('toggleMonitorBtn');
   const monitorIcon = document.getElementById('monitorIcon');
   const monitorBtnText = document.getElementById('monitorBtnText');
@@ -74,7 +69,6 @@ function updateMonitoringStatus(status) {
   if (status.isMonitoring) {
     // 監測中
     statusDot.className = 'status-dot active';
-    monitorInfo.style.display = 'block';
     
     // 根據頁面狀態顯示不同的監測狀態
     if (status.isOnTargetPage) {
@@ -95,17 +89,6 @@ function updateMonitoringStatus(status) {
       pageStatus.className = 'page-status general';
     }
     
-    startTime.textContent = formatTime(status.startTime);
-    lastActivity.textContent = formatTime(status.lastProcessed);
-    
-    // 顯示跳轉統計
-    if (jumpCount) {
-      jumpCount.textContent = status.jumpCount || 0;
-    }
-    if (successfulJumps) {
-      successfulJumps.textContent = status.successfulJumps || 0;
-    }
-    
     toggleBtn.className = 'monitor-btn stop';
     toggleBtn.disabled = false;
     monitorIcon.textContent = '⏹️';
@@ -116,7 +99,6 @@ function updateMonitoringStatus(status) {
     // 未監測
     statusDot.className = 'status-dot inactive';
     statusText.textContent = '監測已停止';
-    monitorInfo.style.display = 'none';
     
     // 顯示當前頁面狀態
     if (currentTabInfo) {
@@ -267,75 +249,6 @@ function showError(message) {
   }, 3000);
 }
 
-// 手動擷取資料
-function captureAndExtract() {
-  const captureBtn = document.getElementById('captureBtn');
-  const statusPanel = document.getElementById('statusPanel');
-  const statusMessage = document.getElementById('statusMessage');
-  const progressBar = document.getElementById('progressBar');
-  
-  // 顯示處理中狀態
-  statusPanel.style.display = 'block';
-  statusMessage.textContent = '處理中...';
-  captureBtn.disabled = true;
-  
-  // 模擬進度條動畫
-  let progress = 0;
-  const progressInterval = setInterval(function() {
-    progress += 5;
-    progressBar.style.width = progress + '%';
-    
-    if (progress >= 100) {
-      clearInterval(progressInterval);
-    }
-  }, 100);
-  
-  // 向背景腳本發送消息
-  chrome.runtime.sendMessage({ action: 'captureAndExtract' }, function(response) {
-    // 清除進度條動畫
-    clearInterval(progressInterval);
-    progressBar.style.width = '100%';
-    captureBtn.disabled = false;
-    
-    // 檢查是否有chrome.runtime.lastError
-    if (chrome.runtime.lastError) {
-      const errorMessage = formatErrorMessage(chrome.runtime.lastError);
-      console.error('發送消息時發生錯誤:', errorMessage);
-      statusMessage.textContent = '通信錯誤: ' + errorMessage;
-      
-      setTimeout(function() {
-        statusPanel.style.display = 'none';
-      }, 5000);
-      return;
-    }
-    
-    // 處理回應
-    if (response && response.success) {
-      // 顯示成功訊息
-      statusMessage.textContent = response.message || '擷取完成！檔案已儲存到下載資料夾。';
-      
-      // 3秒後隱藏狀態面板
-      setTimeout(function() {
-        statusPanel.style.display = 'none';
-      }, 3000);
-    } else {
-      // 顯示錯誤
-      let errorMessage = '未知錯誤';
-      
-      if (response) {
-        errorMessage = response.message || formatErrorMessage(response.error) || '處理失敗';
-      }
-      
-      statusMessage.textContent = '發生錯誤: ' + errorMessage;
-      console.error('擷取失敗:', errorMessage);
-      
-      setTimeout(function() {
-        statusPanel.style.display = 'none';
-      }, 5000);
-    }
-  });
-}
-
 // 檢查是否為目標網址
 function isTargetUrl(url) {
   return url && url.includes('/IMUE0008');
@@ -351,37 +264,6 @@ function isRelevantUrl(url) {
   return url && url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/');
 }
 
-// 更新頁面資訊顯示
-function updatePageInfo() {
-  const pageInfo = document.getElementById('pageInfo');
-  const urlDisplay = document.getElementById('urlDisplay');
-  
-  if (currentTabInfo) {
-    const url = currentTabInfo.url;
-    const title = currentTabInfo.title;
-    
-    // 顯示簡化的 URL
-    let displayUrl = url;
-    if (url.length > 50) {
-      displayUrl = url.substring(0, 47) + '...';
-    }
-    
-    urlDisplay.textContent = displayUrl;
-    urlDisplay.title = url; // 完整 URL 顯示在 tooltip
-    
-    // 根據頁面類型設置樣式
-    if (isTargetUrl(url)) {
-      pageInfo.className = 'page-info target';
-    } else if (isStartUrl(url)) {
-      pageInfo.className = 'page-info start';
-    } else if (isRelevantUrl(url)) {
-      pageInfo.className = 'page-info related';
-    } else {
-      pageInfo.className = 'page-info general';
-    }
-  }
-}
-
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
   // 獲取當前標籤頁
@@ -391,9 +273,6 @@ document.addEventListener('DOMContentLoaded', function() {
       currentTabInfo = tabs[0];
       
       console.log('當前標籤頁:', currentTabInfo.url);
-      
-      // 更新頁面資訊顯示
-      updatePageInfo();
       
       // 檢查監測狀態
       checkMonitoringStatus();
@@ -405,34 +284,10 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 綁定事件監聽器
   const toggleMonitorBtn = document.getElementById('toggleMonitorBtn');
-  const captureBtn = document.getElementById('captureBtn');
-  const helpLink = document.getElementById('helpLink');
-  const settingsLink = document.getElementById('settingsLink');
   
   // 監測控制按鈕
   if (toggleMonitorBtn) {
     toggleMonitorBtn.addEventListener('click', toggleMonitoring);
-  }
-  
-  // 手動擷取按鈕
-  if (captureBtn) {
-    captureBtn.addEventListener('click', captureAndExtract);
-  }
-  
-  // 說明連結
-  if (helpLink) {
-    helpLink.addEventListener('click', function(e) {
-      e.preventDefault();
-      chrome.tabs.create({ url: chrome.runtime.getURL('src/options/help.html') });
-    });
-  }
-  
-  // 設定連結
-  if (settingsLink) {
-    settingsLink.addEventListener('click', function(e) {
-      e.preventDefault();
-      chrome.tabs.create({ url: chrome.runtime.getURL('src/options/options.html') });
-    });
   }
 });
 
@@ -442,4 +297,3 @@ window.addEventListener('beforeunload', function() {
     clearInterval(statusCheckInterval);
   }
 });
-
