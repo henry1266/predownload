@@ -11,7 +11,7 @@ const MONITOR_CONFIG = {
   urlCheckInterval: 500,    // URL 檢查間隔 (毫秒)
   dataCheckDelay: 1500,     // 跳轉後延遲檢查資料的時間
   maxRetries: 3,            // 最大重試次數
-  cooldownPeriod: 3000,    // 冷卻期間 (10秒) - 增加避免重複觸發
+  cooldownPeriod: 2000,    // 冷卻期間 (10秒) - 增加避免重複觸發
   persistenceKey: 'monitoring_state' // 持久化狀態的鍵值
 };
 
@@ -59,7 +59,7 @@ async function restoreMonitoringState() {
       // 檢查狀態是否過期（超過 1 小時自動失效）
       const now = Date.now();
       const stateAge = now - (savedState.timestamp || 0);
-      const maxAge = 60 * 60 * 1000; // 1 小時
+      const maxAge = 60 * 60 * 3000; // 3 小時
       
       if (stateAge > maxAge) {
         console.log('監測狀態已過期，清除狀態');
