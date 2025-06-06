@@ -6,7 +6,8 @@ const MONITOR_CONFIG = {
   startUrl: 'https://medcloud2.nhi.gov.tw/imu/IMUE1000/#',     // 失敗頁面
   targetUrls: [
     'https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008',      // 目標頁面1
-    'https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0060'       // 目標頁面2
+    'https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0060',      // 目標頁面2
+    'https://medcloud2.nhi.gov.tw/imme0008/IMME0008S00.aspx'   // 目標頁面3 (新增)
   ],
   urlCheckInterval: 500,    // URL 檢查間隔 (毫秒)
   dataCheckDelay: 1500,     // 跳轉後延遲檢查資料的時間
@@ -255,7 +256,7 @@ function checkUrlChange() {
 // 檢查是否在目標頁面
 function isOnTargetPage() {
   const url = window.location.href;
-  return url.includes('/IMUE0008') || url.includes('/IMUE0060');
+  return url.includes('/IMUE0008') || url.includes('/IMUE0060') || url.includes('/IMME0008S00.aspx');
 }
 
 // 檢查是否在起始頁面
@@ -272,7 +273,7 @@ function isRelevantPage() {
 
 // 檢查 URL 是否為目標頁面
 function isUrlTargetPage(url) {
-  return url.includes('/IMUE0008') || url.includes('/IMUE0060');
+  return url.includes('/IMUE0008') || url.includes('/IMUE0060') || url.includes('/IMME0008S00.aspx');
 }
 
 // 檢查 URL 是否為起始頁面

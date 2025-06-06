@@ -231,7 +231,7 @@ function showError(message) {
 
 // 檢查是否為目標網址
 function isTargetUrl(url) {
-  return url && url.includes('/IMUE0008');
+  return url && (url.includes('/IMUE0008') || url.includes('/IMME0008S00'));
 }
 
 // 檢查是否為起始網址
@@ -241,7 +241,7 @@ function isStartUrl(url) {
 
 // 檢查是否為相關網址
 function isRelevantUrl(url) {
-  return url && url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/');
+  return url && (url.includes('medcloud2.nhi.gov.tw/imu/IMUE1000/') || url.includes('medcloud.nhi.gov.tw/imme0008/'));
 }
 
 // 初始化
