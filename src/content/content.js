@@ -9,11 +9,11 @@ const MONITOR_CONFIG = {
     'https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0060'       // 目標頁面2
   ],
   urlCheckInterval: 500,    // URL 檢查間隔 (毫秒)
-  dataCheckDelay: 2000,     // 跳轉後延遲檢查資料的時間
+  dataCheckDelay: 1500,     // 跳轉後延遲檢查資料的時間
   maxRetries: 3,            // 最大重試次數
-  cooldownPeriod: 10000,    // 冷卻期間 (10秒) - 增加避免重複觸發
+  cooldownPeriod: 3000,    // 冷卻期間 (10秒) - 增加避免重複觸發
   persistenceKey: 'monitoring_state' // 持久化狀態的鍵值
-};;
+};
 
 // 全域變數
 let isMonitoring = false;
@@ -230,8 +230,8 @@ function checkUrlChange() {
     
     if (isUrlTargetPage(newUrl)) {
       successfulJumps++;
-      console.log(`🎯 成功跳轉到目標頁面！(第 ${successfulJumps} 次)`);
-      notifyUser(`成功跳轉到目標頁面！(第 ${successfulJumps} 次)`, 'success');
+      console.log(`🎯 成功跳轉到目標頁面！`);
+      notifyUser(`成功跳轉到目標頁面！`, 'success');
       
       // 延遲檢查資料，確保頁面完全載入
       setTimeout(() => {
@@ -458,7 +458,7 @@ function triggerAutoActionAfterJump(tableData, personalInfo) {
     chrome.runtime.sendMessage(messageData, function(response) {
       if (chrome.runtime.lastError) {
         console.error('發送 dataChanged 訊息失敗:', chrome.runtime.lastError);
-        notifyUser('自動處理失敗: 通信錯誤', 'error');
+        //notifyUser('自動處理失敗: 通信錯誤', 'error');
         return;
       }
       
@@ -471,7 +471,7 @@ function triggerAutoActionAfterJump(tableData, personalInfo) {
         notifyUser(`自動擷取完成！共 ${dataCount} 筆記錄`, 'success');
       } else {
         console.error('背景腳本處理失敗:', response);
-        notifyUser('自動處理失敗', 'error');
+        //notifyUser('自動處理失敗', 'error');
       }
     });
     
@@ -480,7 +480,7 @@ function triggerAutoActionAfterJump(tableData, personalInfo) {
     
   } catch (error) {
     console.error('觸發跳轉後自動動作時發生錯誤:', error);
-    notifyUser('自動動作執行失敗: ' + error.message, 'error');
+    //notifyUser('自動動作執行失敗: ' + error.message, 'error');
   }
 }
 
