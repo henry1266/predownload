@@ -4,13 +4,16 @@
 // 監測配置
 const MONITOR_CONFIG = {
   startUrl: 'https://medcloud2.nhi.gov.tw/imu/IMUE1000/#',     // 失敗頁面
-  targetUrl: 'https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008', // 成功頁面
+  targetUrls: [
+    'https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0008',      // 目標頁面1
+    'https://medcloud2.nhi.gov.tw/imu/IMUE1000/IMUE0060'       // 目標頁面2
+  ],
   urlCheckInterval: 500,    // URL 檢查間隔 (毫秒)
   dataCheckDelay: 2000,     // 跳轉後延遲檢查資料的時間
   maxRetries: 3,            // 最大重試次數
-  cooldownPeriod: 10000,     // 冷卻期間 (10秒) - 增加避免重複觸發
+  cooldownPeriod: 10000,    // 冷卻期間 (10秒) - 增加避免重複觸發
   persistenceKey: 'monitoring_state' // 持久化狀態的鍵值
-};
+};;
 
 // 全域變數
 let isMonitoring = false;
@@ -230,8 +233,9 @@ function checkUrlChange() {
     
     if (isUrlTargetPage(newUrl)) {
       successfulJumps++;
-      console.log(`🎯 成功跳轉到目標頁面！(第 ${successfulJumps} 次)`);
-      notifyUser(`成功跳轉到目標頁面！(第 ${successfulJumps} 次)`, 'success');
+      const targetPage = newUrl.includes('/IMUE0008') ? 'IMUE0008' : 'IMUE0060';
+      console.log(`🎯 成功跳轉到目標頁面 ${targetPage}！(第 ${successfulJumps} 次)`);
+      notifyUser(`成功跳轉到目標頁面 ${targetPage}！(第 ${successfulJumps} 次)`, 'success');
       
       // 延遲檢查資料，確保頁面完全載入
       setTimeout(() => {
@@ -255,7 +259,7 @@ function checkUrlChange() {
 // 檢查是否在目標頁面
 function isOnTargetPage() {
   const url = window.location.href;
-  return url.includes('/IMUE0008');
+  return url.includes('/IMUE0008') || url.includes('/IMUE0060');
 }
 
 // 檢查是否在起始頁面
@@ -272,7 +276,7 @@ function isRelevantPage() {
 
 // 檢查 URL 是否為目標頁面
 function isUrlTargetPage(url) {
-  return url.includes('/IMUE0008');
+  return url.includes('/IMUE0008') || url.includes('/IMUE0060');
 }
 
 // 檢查 URL 是否為起始頁面
